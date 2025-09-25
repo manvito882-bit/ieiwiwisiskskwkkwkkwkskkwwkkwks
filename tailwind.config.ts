@@ -57,6 +57,11 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        lavender: {
+          light: "hsl(var(--lavender-light))",
+          DEFAULT: "hsl(var(--lavender))",
+          dark: "hsl(var(--lavender-dark))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

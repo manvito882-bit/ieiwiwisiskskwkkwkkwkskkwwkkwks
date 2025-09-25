@@ -1,0 +1,223 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Upload, Play } from 'lucide-react';
+
+interface MediaItem {
+  id: string;
+  title: string;
+  description: string;
+  file_url: string;
+  created_at: string;
+}
+
+const VideoSection = () => {
+  const [videos, setVideos] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadData, setUploadData] = useState({ title: '', description: '', file: null as File | null });
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchVideos();
+  }, []);
+
+  const fetchVideos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('media')
+        .select('*')
+        .eq('content_type', 'video')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setVideos(data || []);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить видео",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadData.file || !user) return;
+
+    setUploading(true);
+    try {
+      // Загружаем файл в Supabase Storage
+      const fileExt = uploadData.file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `videos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media-videos')
+        .upload(filePath, uploadData.file);
+
+      if (uploadError) throw uploadError;
+
+      // Получаем публичный URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media-videos')
+        .getPublicUrl(filePath);
+
+      // Сохраняем информацию о медиа в базу данных
+      const { error: dbError } = await supabase
+        .from('media')
+        .insert({
+          user_id: user.id,
+          title: uploadData.title,
+          description: uploadData.description,
+          file_url: publicUrl,
+          file_type: uploadData.file.type,
+          content_type: 'video',
+          file_size: uploadData.file.size
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Успешно",
+        description: "Видео загружено успешно",
+      });
+
+      setUploadData({ title: '', description: '', file: null });
+      fetchVideos();
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить видео",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-muted-foreground">Загрузка видео...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Видео-контент</h1>
+        {user && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="bg-lavender hover:bg-lavender-dark">
+                <Upload className="w-4 h-4 mr-2" />
+                Загрузить видео
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Загрузить новое видео</DialogTitle>
+                <DialogDescription>
+                  Добавьте название, описание и выберите видео файл для загрузки
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleUpload} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="video-title">Название видео</Label>
+                  <Input
+                    id="video-title"
+                    type="text"
+                    value={uploadData.title}
+                    onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
+                    required
+                    className="border-lavender-light focus:ring-lavender"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="video-description">Описание</Label>
+                  <Textarea
+                    id="video-description"
+                    value={uploadData.description}
+                    onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
+                    className="border-lavender-light focus:ring-lavender"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="video-file">Видео файл</Label>
+                  <Input
+                    id="video-file"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => setUploadData({ ...uploadData, file: e.target.files?.[0] || null })}
+                    required
+                    className="border-lavender-light"
+                  />
+                </div>
+                <Button type="submit" disabled={uploading} className="w-full bg-lavender hover:bg-lavender-dark">
+                  {uploading ? 'Загрузка...' : 'Загрузить видео'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {videos.length === 0 ? (
+        <Card className="text-center p-8 border-lavender-light">
+          <CardContent className="space-y-4">
+            <Play className="w-16 h-16 mx-auto text-lavender" />
+            <div>
+              <h3 className="text-lg font-medium">Пока нет видео</h3>
+              <p className="text-muted-foreground">
+                {user ? 'Будьте первым, кто загрузит видео!' : 'Войдите в систему, чтобы загружать видео'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {videos.map((video) => (
+            <Card key={video.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
+              <div className="aspect-video bg-gray-100">
+                <video
+                  src={video.file_url}
+                  controls
+                  className="w-full h-full object-cover"
+                  preload="metadata"
+                >
+                  Ваш браузер не поддерживает воспроизведение видео.
+                </video>
+              </div>
+              <CardContent className="p-4">
+                <h3 className="font-medium text-sm mb-1 line-clamp-2">{video.title}</h3>
+                {video.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{video.description}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {new Date(video.created_at).toLocaleDateString('ru-RU')}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VideoSection;
