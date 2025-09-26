@@ -65,8 +65,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: data.error as string };
       }
 
-      // После успешной регистрации пытаемся войти
-      return await signIn(username, password);
+      // После успешной регистрации входим через стандартный Supabase auth
+      const tempEmail = `${username}@temp.local`;
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: tempEmail,
+        password: password
+      });
+
+      if (signInError) {
+        return { error: 'Ошибка входа после регистрации' };
+      }
+
+      return { success: true };
     } catch (error) {
       return { error: 'Произошла ошибка при регистрации' };
     } finally {
