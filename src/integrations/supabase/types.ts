@@ -85,17 +85,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      authenticate_user: {
-        Args: { password_param: string; username_param: string }
-        Returns: Json
-      }
-      create_user_with_username: {
-        Args: {
-          is_18_confirmed_param?: boolean
-          password_param: string
-          username_param: string
-        }
-        Returns: Json
+      is_username_available: {
+        Args: { username_param: string }
+        Returns: boolean
       }
     }
     Enums: {

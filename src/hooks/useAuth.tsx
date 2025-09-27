@@ -50,30 +50,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Вызываем нашу кастомную функцию регистрации
-      const { data, error } = await supabase.rpc('create_user_with_username', {
-        username_param: username,
-        password_param: password,
-        is_18_confirmed_param: is18Confirmed
+      // Проверяем уникальность username
+      const { data: isAvailable, error: checkError } = await supabase.rpc('is_username_available', {
+        username_param: username
       });
 
-      if (error) {
-        return { error: error.message };
+      if (checkError) {
+        return { error: 'Ошибка проверки username' };
       }
 
-      if (data && typeof data === 'object' && 'error' in data) {
-        return { error: data.error as string };
+      if (!isAvailable) {
+        return { error: 'Username уже занят' };
       }
 
-      // После успешной регистрации входим через стандартный Supabase auth
+      // Создаем временный email для Supabase auth
       const tempEmail = `${username}@temp.local`;
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      
+      // Регистрируем пользователя через стандартный Supabase auth
+      const { error: signUpError } = await supabase.auth.signUp({
         email: tempEmail,
-        password: password
+        password: password,
+        options: {
+          data: {
+            username: username,
+            is_18_confirmed: is18Confirmed
+          }
+        }
       });
 
-      if (signInError) {
-        return { error: 'Ошибка входа после регистрации' };
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          return { error: 'Пользователь уже существует' };
+        }
+        return { error: signUpError.message };
       }
 
       return { success: true };
@@ -88,38 +97,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Вызываем нашу кастомную функцию аутентификации
-      const { data, error } = await supabase.rpc('authenticate_user', {
-        username_param: username,
-        password_param: password
+      // Создаем временный email для Supabase auth
+      const tempEmail = `${username}@temp.local`;
+      
+      // Входим через стандартный Supabase auth
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: tempEmail,
+        password: password
       });
 
-      if (error) {
-        return { error: error.message };
+      if (signInError) {
+        return { error: 'Неверный username или пароль' };
       }
 
-      if (data && typeof data === 'object' && 'error' in data) {
-        return { error: data.error as string };
-      }
-
-      if (data && typeof data === 'object' && 'success' in data) {
-        // Создаем временный email для Supabase auth
-        const tempEmail = `${username}@temp.local`;
-        
-        // Входим через стандартный Supabase auth
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: tempEmail,
-          password: password
-        });
-
-        if (signInError) {
-          return { error: 'Неверный username или пароль' };
-        }
-
-        return { success: true };
-      }
-
-      return { error: 'Неверный username или пароль' };
+      return { success: true };
     } catch (error) {
       return { error: 'Произошла ошибка при входе' };
     } finally {
