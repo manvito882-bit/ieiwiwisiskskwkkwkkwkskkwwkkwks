@@ -61,7 +61,7 @@ const VideoSection = () => {
       // Загружаем файл в Supabase Storage
       const fileExt = uploadData.file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `videos/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media-videos')
