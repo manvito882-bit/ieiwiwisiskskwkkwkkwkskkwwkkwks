@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Image } from 'lucide-react';
+import { Upload, Image, X } from 'lucide-react';
 
 interface MediaItem {
   id: string;
@@ -22,7 +22,8 @@ const PhotoSection = () => {
   const [photos, setPhotos] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadData, setUploadData] = useState({ title: '', description: '', file: null as File | null });
+  const [uploadData, setUploadData] = useState({ title: '', description: '', files: [] as File[] });
+  const [selectedPhoto, setSelectedPhoto] = useState<MediaItem | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -54,53 +55,57 @@ const PhotoSection = () => {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadData.file || !user) return;
+    if (!uploadData.files.length || !user) return;
 
     setUploading(true);
     try {
-      // Загружаем файл в Supabase Storage
-      const fileExt = uploadData.file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      // Upload each file and create media records
+      const uploadPromises = uploadData.files.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('media-images')
-        .upload(filePath, uploadData.file);
+        const { error: uploadError } = await supabase.storage
+          .from('media-images')
+          .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      // Получаем публичный URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media-images')
-        .getPublicUrl(filePath);
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('media-images')
+          .getPublicUrl(filePath);
 
-      // Сохраняем информацию о медиа в базу данных
-      const { error: dbError } = await supabase
-        .from('media')
-        .insert({
-          user_id: user.id,
-          title: uploadData.title,
-          description: uploadData.description,
-          file_url: publicUrl,
-          file_type: uploadData.file.type,
-          content_type: 'image',
-          file_size: uploadData.file.size
-        });
+        // Save media info to database
+        const { error: dbError } = await supabase
+          .from('media')
+          .insert({
+            user_id: user.id,
+            title: uploadData.title,
+            description: uploadData.description,
+            file_url: publicUrl,
+            file_type: file.type,
+            content_type: 'image',
+            file_size: file.size
+          });
 
-      if (dbError) throw dbError;
+        if (dbError) throw dbError;
+      });
+
+      await Promise.all(uploadPromises);
 
       toast({
         title: "Успешно",
-        description: "Фотография загружена успешно",
+        description: `${uploadData.files.length} фотографий загружено успешно`,
       });
 
-      setUploadData({ title: '', description: '', file: null });
+      setUploadData({ title: '', description: '', files: [] });
       fetchPhotos();
     } catch (error) {
-      console.error('Error uploading photo:', error);
+      console.error('Error uploading photos:', error);
       toast({
         title: "Ошибка",
-        description: "Не удалось загрузить фотографию",
+        description: "Не удалось загрузить фотографии",
         variant: "destructive"
       });
     } finally {
@@ -158,15 +163,44 @@ const PhotoSection = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="photo-file">Изображение</Label>
+                  <Label htmlFor="photo-file">Изображения (до 10 файлов)</Label>
                   <Input
                     id="photo-file"
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setUploadData({ ...uploadData, file: e.target.files?.[0] || null })}
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []).slice(0, 10);
+                      setUploadData({ ...uploadData, files });
+                    }}
                     required
                     className="border-lavender-light"
                   />
+                  {uploadData.files.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Выбрано файлов: {uploadData.files.length}/10
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {uploadData.files.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <span className="text-sm truncate">{file.name}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newFiles = uploadData.files.filter((_, i) => i !== index);
+                                setUploadData({ ...uploadData, files: newFiles });
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <Button type="submit" disabled={uploading} className="w-full bg-lavender hover:bg-lavender-dark">
                   {uploading ? 'Загрузка...' : 'Загрузить фото'}
@@ -192,7 +226,11 @@ const PhotoSection = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {photos.map((photo) => (
-            <Card key={photo.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow group">
+            <Card 
+              key={photo.id} 
+              className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow group cursor-pointer"
+              onClick={() => setSelectedPhoto(photo)}
+            >
               <div className="aspect-square bg-gray-100 overflow-hidden">
                 <img
                   src={photo.file_url}
@@ -214,6 +252,39 @@ const PhotoSection = () => {
           ))}
         </div>
       )}
+
+      {/* Photo Detail Modal */}
+      <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          {selectedPhoto && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedPhoto.title}</DialogTitle>
+                {selectedPhoto.description && (
+                  <DialogDescription>{selectedPhoto.description}</DialogDescription>
+                )}
+              </DialogHeader>
+              <div className="flex justify-center items-center max-h-[70vh] overflow-hidden">
+                <img
+                  src={selectedPhoto.file_url}
+                  alt={selectedPhoto.title}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Загружено: {new Date(selectedPhoto.created_at).toLocaleDateString('ru-RU')}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(selectedPhoto.file_url, '_blank')}
+                >
+                  Открыть в новой вкладке
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
