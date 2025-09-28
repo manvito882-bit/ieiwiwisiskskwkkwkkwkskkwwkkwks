@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Image, X } from 'lucide-react';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Upload, Image, X, ZoomIn } from 'lucide-react';
 
 interface MediaItem {
   id: string;
@@ -16,36 +17,57 @@ interface MediaItem {
   description: string;
   file_url: string;
   created_at: string;
+  content_type: string;
+}
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  media: MediaItem[];
 }
 
 const PhotoSection = () => {
-  const [photos, setPhotos] = useState<MediaItem[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadData, setUploadData] = useState({ title: '', description: '', files: [] as File[] });
-  const [selectedPhoto, setSelectedPhoto] = useState<MediaItem | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchPhotos();
+    fetchPosts();
   }, []);
 
-  const fetchPhotos = async () => {
+  const fetchPosts = async () => {
     try {
       const { data, error } = await supabase
-        .from('media')
-        .select('*')
-        .eq('content_type', 'image')
+        .from('posts')
+        .select(`
+          *,
+          media (
+            id,
+            title,
+            description,
+            file_url,
+            created_at,
+            content_type
+          )
+        `)
+        .eq('category', 'media')
+        .eq('media.content_type', 'image')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPhotos(data || []);
+      setPosts(data || []);
     } catch (error) {
-      console.error('Error fetching photos:', error);
+      console.error('Error fetching posts:', error);
       toast({
         title: "Ошибка",
-        description: "Не удалось загрузить фотографии",
+        description: "Не удалось загрузить фото-посты",
         variant: "destructive"
       });
     } finally {
@@ -59,6 +81,20 @@ const PhotoSection = () => {
 
     setUploading(true);
     try {
+      // First create a post
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          title: uploadData.title,
+          content: uploadData.description,
+          category: 'media'
+        })
+        .select()
+        .single();
+
+      if (postError) throw postError;
+
       // Upload each file and create media records
       const uploadPromises = uploadData.files.map(async (file) => {
         const fileExt = file.name.split('.').pop();
@@ -76,7 +112,7 @@ const PhotoSection = () => {
           .from('media-images')
           .getPublicUrl(filePath);
 
-        // Save media info to database
+        // Save media info to database with post_id
         const { error: dbError } = await supabase
           .from('media')
           .insert({
@@ -86,7 +122,8 @@ const PhotoSection = () => {
             file_url: publicUrl,
             file_type: file.type,
             content_type: 'image',
-            file_size: file.size
+            file_size: file.size,
+            post_id: postData.id
           });
 
         if (dbError) throw dbError;
@@ -96,16 +133,16 @@ const PhotoSection = () => {
 
       toast({
         title: "Успешно",
-        description: `${uploadData.files.length} фотографий загружено успешно`,
+        description: `Пост с ${uploadData.files.length} фотографиями создан успешно`,
       });
 
       setUploadData({ title: '', description: '', files: [] });
-      fetchPhotos();
+      fetchPosts();
     } catch (error) {
       console.error('Error uploading photos:', error);
       toast({
         title: "Ошибка",
-        description: "Не удалось загрузить фотографии",
+        description: "Не удалось создать пост с фотографиями",
         variant: "destructive"
       });
     } finally {
@@ -211,41 +248,72 @@ const PhotoSection = () => {
         )}
       </div>
 
-      {photos.length === 0 ? (
+      {posts.length === 0 ? (
         <Card className="text-center p-8 border-lavender-light">
           <CardContent className="space-y-4">
             <Image className="w-16 h-16 mx-auto text-lavender" />
             <div>
-              <h3 className="text-lg font-medium">Пока нет фотографий</h3>
+              <h3 className="text-lg font-medium">Пока нет фото-постов</h3>
               <p className="text-muted-foreground">
-                {user ? 'Будьте первым, кто загрузит фото!' : 'Войдите в систему, чтобы загружать фото'}
+                {user ? 'Будьте первым, кто создаст фото-пост!' : 'Войдите в систему, чтобы создавать фото-посты'}
               </p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {photos.map((photo) => (
-            <Card 
-              key={photo.id} 
-              className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow group cursor-pointer"
-              onClick={() => setSelectedPhoto(photo)}
-            >
-              <div className="aspect-square bg-gray-100 overflow-hidden">
-                <img
-                  src={photo.file_url}
-                  alt={photo.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {posts.map((post) => (
+            <Card key={post.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gray-100 overflow-hidden relative">
+                {post.media.length > 1 ? (
+                  <Carousel className="w-full h-full">
+                    <CarouselContent>
+                      {post.media.map((media, index) => (
+                        <CarouselItem key={media.id}>
+                          <img
+                            src={media.file_url}
+                            alt={media.title}
+                            className="w-full h-full object-cover cursor-pointer"
+                            loading="lazy"
+                            onClick={() => setSelectedMedia({ media: post.media, currentIndex: index })}
+                          />
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="left-2" />
+                    <CarouselNext className="right-2" />
+                  </Carousel>
+                ) : post.media.length === 1 ? (
+                  <img
+                    src={post.media[0].file_url}
+                    alt={post.media[0].title}
+                    className="w-full h-full object-cover cursor-pointer"
+                    loading="lazy"
+                    onClick={() => setSelectedMedia({ media: post.media, currentIndex: 0 })}
+                  />
+                ) : null}
+                
+                {post.media.length > 1 && (
+                  <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                    {post.media.length} фото
+                  </div>
+                )}
+                
+                <Button
+                  size="sm"
+                  className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 text-white"
+                  onClick={() => setSelectedMedia({ media: post.media, currentIndex: 0 })}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
               </div>
-              <CardContent className="p-3">
-                <h3 className="font-medium text-sm mb-1 line-clamp-2">{photo.title}</h3>
-                {photo.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{photo.description}</p>
+              <CardContent className="p-4">
+                <h3 className="font-medium text-lg mb-2 line-clamp-2">{post.title}</h3>
+                {post.content && (
+                  <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{post.content}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {new Date(photo.created_at).toLocaleDateString('ru-RU')}
+                  {new Date(post.created_at).toLocaleDateString('ru-RU')}
                 </p>
               </CardContent>
             </Card>
@@ -253,33 +321,69 @@ const PhotoSection = () => {
         </div>
       )}
 
-      {/* Photo Detail Modal */}
-      <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          {selectedPhoto && (
+      {/* Media Detail Modal with Carousel */}
+      <Dialog open={!!selectedMedia} onOpenChange={(open) => !open && setSelectedMedia(null)}>
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden">
+          {selectedMedia && (
             <>
               <DialogHeader>
-                <DialogTitle>{selectedPhoto.title}</DialogTitle>
-                {selectedPhoto.description && (
-                  <DialogDescription>{selectedPhoto.description}</DialogDescription>
+                <DialogTitle>
+                  {selectedMedia.media.length > 1 
+                    ? `Фото ${selectedMedia.currentIndex + 1} из ${selectedMedia.media.length}`
+                    : selectedMedia.media[selectedMedia.currentIndex]?.title || 'Фото'
+                  }
+                </DialogTitle>
+                {selectedMedia.media[selectedMedia.currentIndex]?.description && (
+                  <DialogDescription>
+                    {selectedMedia.media[selectedMedia.currentIndex].description}
+                  </DialogDescription>
                 )}
               </DialogHeader>
-              <div className="flex justify-center items-center max-h-[70vh] overflow-hidden">
-                <img
-                  src={selectedPhoto.file_url}
-                  alt={selectedPhoto.title}
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-              <div className="flex justify-between items-center text-sm text-muted-foreground">
-                <span>Загружено: {new Date(selectedPhoto.created_at).toLocaleDateString('ru-RU')}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(selectedPhoto.file_url, '_blank')}
-                >
-                  Открыть в новой вкладке
-                </Button>
+              
+              {selectedMedia.media.length > 1 ? (
+                <Carousel className="w-full max-h-[75vh]">
+                  <CarouselContent>
+                    {selectedMedia.media.map((media, index) => (
+                      <CarouselItem key={media.id}>
+                        <div className="flex justify-center items-center h-[75vh] overflow-hidden">
+                          <img
+                            src={media.file_url}
+                            alt={media.title}
+                            className="max-w-full max-h-full object-contain cursor-zoom-in"
+                            onClick={() => window.open(media.file_url, '_blank')}
+                          />
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-4" />
+                  <CarouselNext className="right-4" />
+                </Carousel>
+              ) : (
+                <div className="flex justify-center items-center max-h-[75vh] overflow-hidden">
+                  <img
+                    src={selectedMedia.media[0].file_url}
+                    alt={selectedMedia.media[0].title}
+                    className="max-w-full max-h-full object-contain cursor-zoom-in"
+                    onClick={() => window.open(selectedMedia.media[0].file_url, '_blank')}
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center text-sm text-muted-foreground mt-4">
+                <span>
+                  Загружено: {new Date(selectedMedia.media[selectedMedia.currentIndex].created_at).toLocaleDateString('ru-RU')}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(selectedMedia.media[selectedMedia.currentIndex].file_url, '_blank')}
+                  >
+                    <ZoomIn className="w-4 h-4 mr-2" />
+                    Увеличить
+                  </Button>
+                </div>
               </div>
             </>
           )}
