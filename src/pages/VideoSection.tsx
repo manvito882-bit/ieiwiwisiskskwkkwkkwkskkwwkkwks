@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Play, Radio, Eye } from 'lucide-react';
+import { Upload, Play, Radio, Eye, Trash2 } from 'lucide-react';
 import { LiveStream } from '@/components/LiveStream';
 import { LiveStreamViewer } from '@/components/LiveStreamViewer';
 
@@ -18,6 +18,10 @@ interface MediaItem {
   description: string;
   file_url: string;
   created_at: string;
+  user_id: string;
+  profiles?: {
+    username: string;
+  };
 }
 
 const VideoSection = () => {
@@ -40,7 +44,7 @@ const VideoSection = () => {
     try {
       const { data, error } = await supabase
         .from('media')
-        .select('*')
+        .select('*, profiles(username)')
         .eq('content_type', 'video')
         .order('created_at', { ascending: false });
 
@@ -55,6 +59,38 @@ const VideoSection = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (videoId: string, filePath: string) => {
+    try {
+      // Удаляем файл из storage
+      const path = filePath.split('/media-videos/')[1];
+      if (path) {
+        await supabase.storage.from('media-videos').remove([path]);
+      }
+
+      // Удаляем запись из базы данных
+      const { error } = await supabase
+        .from('media')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Успешно",
+        description: "Видео удалено",
+      });
+
+      fetchVideos();
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить видео",
+        variant: "destructive"
+      });
     }
   };
 
@@ -289,13 +325,26 @@ const VideoSection = () => {
                 </video>
               </div>
               <CardContent className="p-4">
-                <h3 className="font-medium text-sm mb-1 line-clamp-2">{video.title}</h3>
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-medium text-sm line-clamp-2 flex-1">{video.title}</h3>
+                  {user?.id === video.user_id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(video.id, video.file_url)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
                 {video.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{video.description}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  {new Date(video.created_at).toLocaleDateString('ru-RU')}
-                </p>
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>{(video as any).profiles?.username || 'Пользователь'}</span>
+                  <span>{new Date(video.created_at).toLocaleDateString('ru-RU')}</span>
+                </div>
               </CardContent>
             </Card>
           ))}
