@@ -209,9 +209,11 @@ const VideoSection = () => {
 
       <LiveStream 
         isOpen={isLiveStreamOpen}
-        onClose={() => setIsLiveStreamOpen(false)}
-        onStreamStart={(streamId) => {
+        onClose={() => {
           setIsLiveStreamOpen(false);
+          fetchLiveStreams();
+        }}
+        onStreamStart={(streamId) => {
           fetchLiveStreams();
         }}
       />
