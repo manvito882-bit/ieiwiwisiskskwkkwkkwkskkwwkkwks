@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Play } from 'lucide-react';
+import { Upload, Play, Radio, Eye } from 'lucide-react';
+import { LiveStream } from '@/components/LiveStream';
+import { LiveStreamViewer } from '@/components/LiveStreamViewer';
 
 interface MediaItem {
   id: string;
@@ -20,14 +22,18 @@ interface MediaItem {
 
 const VideoSection = () => {
   const [videos, setVideos] = useState<MediaItem[]>([]);
+  const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadData, setUploadData] = useState({ title: '', description: '', file: null as File | null });
+  const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
+  const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchVideos();
+    fetchLiveStreams();
   }, []);
 
   const fetchVideos = async () => {
@@ -49,6 +55,21 @@ const VideoSection = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLiveStreams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('live_streams')
+        .select('*, profiles(username)')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLiveStreams(data || []);
+    } catch (error) {
+      console.error('Error fetching live streams:', error);
     }
   };
 
@@ -121,13 +142,21 @@ const VideoSection = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Видео-контент</h1>
         {user && (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-lavender hover:bg-lavender-dark">
-                <Upload className="w-4 h-4 mr-2" />
-                Загрузить видео
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setIsLiveStreamOpen(true)}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              <Radio className="w-4 h-4 mr-2" />
+              Начать эфир
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-lavender hover:bg-lavender-dark">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Загрузить видео
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Загрузить новое видео</DialogTitle>
@@ -174,8 +203,62 @@ const VideoSection = () => {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         )}
       </div>
+
+      <LiveStream 
+        isOpen={isLiveStreamOpen}
+        onClose={() => setIsLiveStreamOpen(false)}
+        onStreamStart={(streamId) => {
+          setIsLiveStreamOpen(false);
+          fetchLiveStreams();
+        }}
+      />
+
+      <LiveStreamViewer 
+        streamId={viewingStreamId}
+        onClose={() => setViewingStreamId(null)}
+      />
+
+      {liveStreams.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+            Прямые эфиры
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {liveStreams.map((stream) => (
+              <Card 
+                key={stream.id} 
+                className="overflow-hidden border-red-200 hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => setViewingStreamId(stream.id)}
+              >
+                <div className="aspect-video bg-gradient-to-br from-red-500 to-pink-500 relative flex items-center justify-center">
+                  <Radio className="w-16 h-16 text-white/50" />
+                  <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold">
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                    <span>В ЭФИРЕ</span>
+                  </div>
+                  <div className="absolute bottom-4 right-4 flex items-center gap-1 px-2 py-1 bg-black/50 text-white rounded text-sm">
+                    <Eye className="w-3 h-3" />
+                    <span>{stream.viewer_count || 0}</span>
+                  </div>
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="font-medium text-sm mb-1 line-clamp-2">{stream.title}</h3>
+                  {stream.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{stream.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {stream.profiles?.username || 'Пользователь'}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {videos.length === 0 ? (
         <Card className="text-center p-8 border-lavender-light">
