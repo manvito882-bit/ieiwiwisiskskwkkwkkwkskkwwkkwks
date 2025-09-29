@@ -21,7 +21,7 @@ interface MediaItem {
   user_id: string;
   profiles?: {
     username: string;
-  };
+  } | null;
 }
 
 const VideoSection = () => {
@@ -44,12 +44,12 @@ const VideoSection = () => {
     try {
       const { data, error } = await supabase
         .from('media')
-        .select('*, profiles(username)')
+        .select('*, profiles!media_user_id_fkey(username)')
         .eq('content_type', 'video')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setVideos(data || []);
+      setVideos(data as any || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
       toast({
