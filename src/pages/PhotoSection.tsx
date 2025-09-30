@@ -9,7 +9,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Upload, Image, X, ZoomIn } from 'lucide-react';
+import { Upload, Image, X, ZoomIn, User, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import Comments from '@/components/Comments';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface MediaItem {
   id: string;
@@ -27,6 +30,9 @@ interface Post {
   created_at: string;
   user_id: string;
   media: MediaItem[];
+  profiles?: {
+    username: string;
+  } | null;
 }
 
 const PhotoSection = () => {
@@ -35,8 +41,10 @@ const PhotoSection = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadData, setUploadData] = useState({ title: '', description: '', files: [] as File[] });
   const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
+  const [openComments, setOpenComments] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPosts();
@@ -48,6 +56,7 @@ const PhotoSection = () => {
         .from('posts')
         .select(`
           *,
+          profiles!posts_user_id_fkey(username),
           media (
             id,
             title,
@@ -62,7 +71,7 @@ const PhotoSection = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data || []);
+      setPosts(data as any || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({
@@ -307,14 +316,40 @@ const PhotoSection = () => {
                   <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
-              <CardContent className="p-4">
-                <h3 className="font-medium text-lg mb-2 line-clamp-2">{post.title}</h3>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="w-4 h-4 text-lavender" />
+                  <button
+                    onClick={() => post.profiles?.username && navigate(`/profile/${post.profiles.username}`)}
+                    className="font-medium hover:text-lavender transition-colors"
+                  >
+                    {post.profiles?.username || 'Пользователь'}
+                  </button>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(post.created_at).toLocaleDateString('ru-RU')}
+                  </span>
+                </div>
+                
+                <h3 className="font-medium text-lg line-clamp-2">{post.title}</h3>
                 {post.content && (
-                  <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{post.content}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  {new Date(post.created_at).toLocaleDateString('ru-RU')}
-                </p>
+                
+                <Collapsible
+                  open={openComments === post.id}
+                  onOpenChange={(open) => setOpenComments(open ? post.id : null)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Комментарии
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4">
+                    <Comments postId={post.id} />
+                  </CollapsibleContent>
+                </Collapsible>
               </CardContent>
             </Card>
           ))}

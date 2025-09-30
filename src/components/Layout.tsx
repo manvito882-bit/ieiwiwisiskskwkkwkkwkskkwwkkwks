@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Play, Image as ImageIcon, Home, LogOut, User } from 'lucide-react';
+import UserSearch from '@/components/UserSearch';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,6 +30,9 @@ const Layout = ({ children }: LayoutProps) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
               <h1 className="text-2xl font-bold text-primary">Медиа Платформа</h1>
+              <div className="hidden md:block">
+                <UserSearch />
+              </div>
               <nav className="hidden md:flex items-center space-x-1">
                 <Button
                   variant={isActive('/') ? 'default' : 'ghost'}

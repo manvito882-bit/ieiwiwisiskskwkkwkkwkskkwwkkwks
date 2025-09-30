@@ -11,6 +11,7 @@ const Index = lazy(() => import('./pages/Index'));
 const Auth = lazy(() => import('./pages/Auth'));
 const VideoSection = lazy(() => import('./pages/VideoSection'));
 const PhotoSection = lazy(() => import('./pages/PhotoSection'));
+const Profile = lazy(() => import('./pages/Profile'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -80,6 +81,13 @@ const App = () => (
                   <ProtectedRoute>
                     <Layout>
                       <PhotoSection />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/profile/:username" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Profile />
                     </Layout>
                   </ProtectedRoute>
                 } />

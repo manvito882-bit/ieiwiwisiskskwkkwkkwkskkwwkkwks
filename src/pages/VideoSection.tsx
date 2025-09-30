@@ -8,9 +8,12 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Play, Radio, Eye, Trash2 } from 'lucide-react';
+import { Upload, Play, Radio, Eye, Trash2, User, MessageSquare } from 'lucide-react';
 import { LiveStream } from '@/components/LiveStream';
 import { LiveStreamViewer } from '@/components/LiveStreamViewer';
+import { useNavigate } from 'react-router-dom';
+import Comments from '@/components/Comments';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface MediaItem {
   id: string;
@@ -19,6 +22,7 @@ interface MediaItem {
   file_url: string;
   created_at: string;
   user_id: string;
+  post_id?: string | null;
   profiles?: {
     username: string;
   } | null;
@@ -32,8 +36,10 @@ const VideoSection = () => {
   const [uploadData, setUploadData] = useState({ title: '', description: '', file: null as File | null });
   const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
   const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
+  const [openComments, setOpenComments] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchVideos();
@@ -324,27 +330,53 @@ const VideoSection = () => {
                   Ваш браузер не поддерживает воспроизведение видео.
                 </video>
               </div>
-              <CardContent className="p-4">
+              <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-medium text-sm line-clamp-2 flex-1">{video.title}</h3>
+                  <div className="flex items-center gap-2 flex-1">
+                    <User className="w-4 h-4 text-lavender flex-shrink-0" />
+                    <button
+                      onClick={() => video.profiles?.username && navigate(`/profile/${video.profiles.username}`)}
+                      className="font-medium text-sm hover:text-lavender transition-colors truncate"
+                    >
+                      {video.profiles?.username || 'Пользователь'}
+                    </button>
+                  </div>
                   {user?.id === video.user_id && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-8 w-8 text-destructive hover:text-destructive flex-shrink-0"
                       onClick={() => handleDelete(video.id, video.file_url)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
+                
+                <h3 className="font-medium text-sm line-clamp-2">{video.title}</h3>
                 {video.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{video.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{video.description}</p>
                 )}
-                <div className="flex justify-between items-center text-xs text-muted-foreground">
-                  <span>{(video as any).profiles?.username || 'Пользователь'}</span>
-                  <span>{new Date(video.created_at).toLocaleDateString('ru-RU')}</span>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(video.created_at).toLocaleDateString('ru-RU')}
+                </p>
+                
+                {video.post_id && (
+                  <Collapsible
+                    open={openComments === video.id}
+                    onOpenChange={(open) => setOpenComments(open ? video.id : null)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Комментарии
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-4">
+                      <Comments postId={video.post_id} />
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
               </CardContent>
             </Card>
           ))}
