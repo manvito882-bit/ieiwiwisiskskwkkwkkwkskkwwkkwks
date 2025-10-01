@@ -56,7 +56,7 @@ const PhotoSection = () => {
         .from('posts')
         .select(`
           *,
-          profiles!posts_user_id_fkey(username),
+          profiles!posts_user_id_fkey:user_id(username),
           media (
             id,
             title,
