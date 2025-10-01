@@ -12,6 +12,7 @@ const Auth = lazy(() => import('./pages/Auth'));
 const VideoSection = lazy(() => import('./pages/VideoSection'));
 const PhotoSection = lazy(() => import('./pages/PhotoSection'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Messages = lazy(() => import('./components/Messages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -63,34 +64,17 @@ const App = () => (
                     <Auth />
                   </PublicRoute>
                 } />
-                <Route path="/" element={
+                <Route element={
                   <ProtectedRoute>
-                    <Layout>
-                      <Index />
-                    </Layout>
+                    <Layout />
                   </ProtectedRoute>
-                } />
-                <Route path="/videos" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <VideoSection />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/photos" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <PhotoSection />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/profile/:username" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Profile />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                }>
+                  <Route index element={<Index />} />
+                  <Route path="/videos" element={<VideoSection />} />
+                  <Route path="/photos" element={<PhotoSection />} />
+                  <Route path="/profile/:username" element={<Profile />} />
+                  <Route path="/messages" element={<Messages />} />
+                </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
