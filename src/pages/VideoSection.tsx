@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Play, Radio, Eye, Trash2, User, MessageSquare } from 'lucide-react';
+import { Upload, Play, Radio, Eye, Trash2, User, MessageSquare, Flame } from 'lucide-react';
 import { LiveStream } from '@/components/LiveStream';
 import { LiveStreamViewer } from '@/components/LiveStreamViewer';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,8 @@ interface MediaItem {
   created_at: string;
   user_id: string;
   post_id?: string | null;
+  likes_count?: number;
+  isLiked?: boolean;
   profiles?: {
     username: string;
   } | null;
@@ -41,21 +43,106 @@ const VideoSection = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const toggleLike = async (video: MediaItem) => {
+    if (!user) {
+      toast({
+        title: "Требуется авторизация",
+        description: "Войдите, чтобы ставить лайки",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!video.post_id) return;
+
+    try {
+      if (video.isLiked) {
+        // Удаляем лайк
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', video.post_id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      } else {
+        // Добавляем лайк
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({ post_id: video.post_id, user_id: user.id });
+
+        if (error) throw error;
+      }
+
+      // Обновляем локальное состояние
+      setVideos(videos.map(v => 
+        v.id === video.id 
+          ? { 
+              ...v, 
+              isLiked: !v.isLiked,
+              likes_count: (v.likes_count || 0) + (v.isLiked ? -1 : 1)
+            }
+          : v
+      ));
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить лайк",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     fetchVideos();
     fetchLiveStreams();
-  }, []);
+  }, [user]);
 
   const fetchVideos = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: videosData, error } = await supabase
         .from('media')
-        .select('*, profiles!media_user_id_fkey(username)')
+        .select('*')
         .eq('content_type', 'video')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setVideos(data as any || []);
+
+      // Получаем профили и посты для видео
+      const userIds = [...new Set(videosData?.map(v => v.user_id) || [])];
+      const postIds = videosData?.filter(v => v.post_id).map(v => v.post_id) || [];
+
+      const [{ data: profilesData }, { data: postsData }] = await Promise.all([
+        supabase.from('profiles').select('user_id, username').in('user_id', userIds),
+        postIds.length > 0 
+          ? supabase.from('posts').select('id, likes_count').in('id', postIds)
+          : Promise.resolve({ data: [] })
+      ]);
+
+      // Получаем лайки пользователя если он авторизован
+      let userLikes: string[] = [];
+      if (user && postIds.length > 0) {
+        const { data: likesData } = await supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', user.id)
+          .in('post_id', postIds);
+        userLikes = likesData?.map(like => like.post_id) || [];
+      }
+
+      // Объединяем данные
+      const videosWithData = videosData?.map(video => {
+        const post = postsData?.find(p => p.id === video.post_id);
+        return {
+          ...video,
+          profiles: profilesData?.find(p => p.user_id === video.user_id) || null,
+          likes_count: post?.likes_count || 0,
+          isLiked: video.post_id ? userLikes.includes(video.post_id) : false
+        };
+      });
+
+      setVideos(videosWithData as any || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
       toast({
@@ -121,6 +208,20 @@ const VideoSection = () => {
 
     setUploading(true);
     try {
+      // Создаем пост для видео
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          title: uploadData.title,
+          content: uploadData.description,
+          category: 'media'
+        })
+        .select()
+        .single();
+
+      if (postError) throw postError;
+
       // Загружаем файл в Supabase Storage
       const fileExt = uploadData.file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
@@ -147,7 +248,8 @@ const VideoSection = () => {
           file_url: publicUrl,
           file_type: uploadData.file.type,
           content_type: 'video',
-          file_size: uploadData.file.size
+          file_size: uploadData.file.size,
+          post_id: postData.id
         });
 
       if (dbError) throw dbError;
@@ -360,6 +462,20 @@ const VideoSection = () => {
                 <p className="text-xs text-muted-foreground">
                   {new Date(video.created_at).toLocaleDateString('ru-RU')}
                 </p>
+                
+                {video.post_id && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleLike(video)}
+                      className={video.isLiked ? "text-orange-500 hover:text-orange-600" : ""}
+                    >
+                      <Flame className={`w-5 h-5 mr-1 ${video.isLiked ? 'fill-current' : ''}`} />
+                      {video.likes_count || 0}
+                    </Button>
+                  </div>
+                )}
                 
                 {video.post_id && (
                   <Collapsible

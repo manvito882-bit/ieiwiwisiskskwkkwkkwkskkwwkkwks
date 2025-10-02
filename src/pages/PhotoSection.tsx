@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Upload, Image, X, ZoomIn, User, MessageSquare } from 'lucide-react';
+import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -29,10 +29,12 @@ interface Post {
   content: string;
   created_at: string;
   user_id: string;
+  likes_count: number;
   media: MediaItem[];
   profiles?: {
     username: string;
   } | null;
+  isLiked?: boolean;
 }
 
 const PhotoSection = () => {
@@ -46,17 +48,68 @@ const PhotoSection = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const toggleLike = async (postId: string) => {
+    if (!user) {
+      toast({
+        title: "Требуется авторизация",
+        description: "Войдите, чтобы ставить лайки",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    try {
+      if (post.isLiked) {
+        // Удаляем лайк
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      } else {
+        // Добавляем лайк
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({ post_id: postId, user_id: user.id });
+
+        if (error) throw error;
+      }
+
+      // Обновляем локальное состояние
+      setPosts(posts.map(p => 
+        p.id === postId 
+          ? { 
+              ...p, 
+              isLiked: !p.isLiked,
+              likes_count: p.isLiked ? p.likes_count - 1 : p.likes_count + 1
+            }
+          : p
+      ));
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить лайк",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [user]);
 
   const fetchPosts = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: postsData, error } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles!posts_user_id_fkey(username),
           media!inner (
             id,
             title,
@@ -71,7 +124,32 @@ const PhotoSection = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data as any || []);
+
+      // Получаем профили пользователей отдельно
+      const userIds = [...new Set(postsData?.map(post => post.user_id) || [])];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, username')
+        .in('user_id', userIds);
+
+      // Получаем лайки пользователя если он авторизован
+      let userLikes: string[] = [];
+      if (user) {
+        const { data: likesData } = await supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', user.id);
+        userLikes = likesData?.map(like => like.post_id) || [];
+      }
+
+      // Объединяем данные
+      const postsWithProfiles = postsData?.map(post => ({
+        ...post,
+        profiles: profilesData?.find(p => p.user_id === post.user_id) || null,
+        isLiked: userLikes.includes(post.id)
+      }));
+
+      setPosts(postsWithProfiles as any || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({
@@ -335,6 +413,18 @@ const PhotoSection = () => {
                 {post.content && (
                   <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
                 )}
+                
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleLike(post.id)}
+                    className={post.isLiked ? "text-orange-500 hover:text-orange-600" : ""}
+                  >
+                    <Flame className={`w-5 h-5 mr-1 ${post.isLiked ? 'fill-current' : ''}`} />
+                    {post.likes_count}
+                  </Button>
+                </div>
                 
                 <Collapsible
                   open={openComments === post.id}
