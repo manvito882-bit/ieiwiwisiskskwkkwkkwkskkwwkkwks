@@ -154,6 +154,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          image_url: string | null
           is_read: boolean
           receiver_id: string
           sender_id: string
@@ -163,6 +164,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          image_url?: string | null
           is_read?: boolean
           receiver_id: string
           sender_id: string
@@ -172,6 +174,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          image_url?: string | null
           is_read?: boolean
           receiver_id?: string
           sender_id?: string
@@ -220,6 +223,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          view_condition: Database["public"]["Enums"]["view_condition"]
           views_count: number
         }
         Insert: {
@@ -233,6 +237,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          view_condition?: Database["public"]["Enums"]["view_condition"]
           views_count?: number
         }
         Update: {
@@ -246,6 +251,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          view_condition?: Database["public"]["Enums"]["view_condition"]
           views_count?: number
         }
         Relationships: []
@@ -288,7 +294,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      view_condition: "none" | "like" | "comment"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -415,6 +421,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      view_condition: ["none", "like", "comment"],
+    },
   },
 } as const

@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame } from 'lucide-react';
+import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -30,18 +31,26 @@ interface Post {
   created_at: string;
   user_id: string;
   likes_count: number;
+  view_condition: 'none' | 'like' | 'comment';
   media: MediaItem[];
   profiles?: {
     username: string;
   } | null;
   isLiked?: boolean;
+  hasCommented?: boolean;
+  canView?: boolean;
 }
 
 const PhotoSection = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadData, setUploadData] = useState({ title: '', description: '', files: [] as File[] });
+  const [uploadData, setUploadData] = useState({ 
+    title: '', 
+    description: '', 
+    files: [] as File[], 
+    viewCondition: 'none' as 'none' | 'like' | 'comment'
+  });
   const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
   const { user } = useAuth();
@@ -132,22 +141,42 @@ const PhotoSection = () => {
         .select('user_id, username')
         .in('user_id', userIds);
 
-      // Получаем лайки пользователя если он авторизован
+      // Получаем лайки и комментарии пользователя если он авторизован
       let userLikes: string[] = [];
+      let userComments: string[] = [];
       if (user) {
-        const { data: likesData } = await supabase
-          .from('post_likes')
-          .select('post_id')
-          .eq('user_id', user.id);
+        const [{ data: likesData }, { data: commentsData }] = await Promise.all([
+          supabase.from('post_likes').select('post_id').eq('user_id', user.id),
+          supabase.from('comments').select('post_id').eq('user_id', user.id)
+        ]);
         userLikes = likesData?.map(like => like.post_id) || [];
+        userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
       }
 
       // Объединяем данные
-      const postsWithProfiles = postsData?.map(post => ({
-        ...post,
-        profiles: profilesData?.find(p => p.user_id === post.user_id) || null,
-        isLiked: userLikes.includes(post.id)
-      }));
+      const postsWithProfiles = postsData?.map(post => {
+        const isLiked = userLikes.includes(post.id);
+        const hasCommented = userComments.includes(post.id);
+        const isOwner = user?.id === post.user_id;
+        
+        // Определяем можно ли просматривать контент
+        let canView = true;
+        if (!isOwner && post.view_condition !== 'none') {
+          if (post.view_condition === 'like' && !isLiked) {
+            canView = false;
+          } else if (post.view_condition === 'comment' && !hasCommented) {
+            canView = false;
+          }
+        }
+
+        return {
+          ...post,
+          profiles: profilesData?.find(p => p.user_id === post.user_id) || null,
+          isLiked,
+          hasCommented,
+          canView
+        };
+      });
 
       setPosts(postsWithProfiles as any || []);
     } catch (error) {
@@ -175,7 +204,8 @@ const PhotoSection = () => {
           user_id: user.id,
           title: uploadData.title,
           content: uploadData.description,
-          category: 'media'
+          category: 'media',
+          view_condition: uploadData.viewCondition
         })
         .select()
         .single();
@@ -223,7 +253,7 @@ const PhotoSection = () => {
         description: `Пост с ${uploadData.files.length} фотографиями создан успешно`,
       });
 
-      setUploadData({ title: '', description: '', files: [] });
+      setUploadData({ title: '', description: '', files: [], viewCondition: 'none' });
       fetchPosts();
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -285,6 +315,27 @@ const PhotoSection = () => {
                     className="border-lavender-light focus:ring-lavender"
                     rows={3}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="view-condition">Условие просмотра</Label>
+                  <Select
+                    value={uploadData.viewCondition}
+                    onValueChange={(value: 'none' | 'like' | 'comment') => 
+                      setUploadData({ ...uploadData, viewCondition: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Без условий (свободный просмотр)</SelectItem>
+                      <SelectItem value="like">Требуется лайк 🔥</SelectItem>
+                      <SelectItem value="comment">Требуется комментарий 💬</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Выберите условие для доступа к вашим фото
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="photo-file">Изображения (до 10 файлов)</Label>
@@ -357,13 +408,27 @@ const PhotoSection = () => {
                     <CarouselContent>
                       {post.media.map((media, index) => (
                         <CarouselItem key={media.id}>
-                          <img
-                            src={media.file_url}
-                            alt={media.title}
-                            className="w-full h-full object-cover cursor-pointer"
-                            loading="lazy"
-                            onClick={() => setSelectedMedia({ media: post.media, currentIndex: index })}
-                          />
+                          <div className="relative w-full h-full">
+                            <img
+                              src={media.file_url}
+                              alt={media.title}
+                              className={`w-full h-full object-cover cursor-pointer ${
+                                !post.canView ? 'blur-xl' : ''
+                              }`}
+                              loading="lazy"
+                              onClick={() => post.canView && setSelectedMedia({ media: post.media, currentIndex: index })}
+                            />
+                            {!post.canView && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
+                                <Lock className="w-12 h-12 mb-2" />
+                                <p className="text-center font-semibold">
+                                  {post.view_condition === 'like' 
+                                    ? 'Поставьте лайк 🔥 чтобы просмотреть' 
+                                    : 'Оставьте комментарий 💬 чтобы просмотреть'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </CarouselItem>
                       ))}
                     </CarouselContent>
@@ -371,13 +436,27 @@ const PhotoSection = () => {
                     <CarouselNext className="right-2" />
                   </Carousel>
                 ) : post.media.length === 1 ? (
-                  <img
-                    src={post.media[0].file_url}
-                    alt={post.media[0].title}
-                    className="w-full h-full object-cover cursor-pointer"
-                    loading="lazy"
-                    onClick={() => setSelectedMedia({ media: post.media, currentIndex: 0 })}
-                  />
+                  <div className="relative w-full h-full">
+                    <img
+                      src={post.media[0].file_url}
+                      alt={post.media[0].title}
+                      className={`w-full h-full object-cover cursor-pointer ${
+                        !post.canView ? 'blur-xl' : ''
+                      }`}
+                      loading="lazy"
+                      onClick={() => post.canView && setSelectedMedia({ media: post.media, currentIndex: 0 })}
+                    />
+                    {!post.canView && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
+                        <Lock className="w-12 h-12 mb-2" />
+                        <p className="text-center font-semibold text-sm">
+                          {post.view_condition === 'like' 
+                            ? 'Поставьте лайк 🔥 чтобы просмотреть' 
+                            : 'Оставьте комментарий 💬 чтобы просмотреть'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ) : null}
                 
                 {post.media.length > 1 && (

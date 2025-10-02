@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, ArrowLeft } from 'lucide-react';
+import { Send, ArrowLeft, Image as ImageIcon, X } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Message {
@@ -16,6 +17,7 @@ interface Message {
   content: string;
   created_at: string;
   is_read: boolean;
+  image_url?: string | null;
 }
 
 interface Conversation {
@@ -35,6 +37,9 @@ const Messages = () => {
   const [activeUsername, setActiveUsername] = useState<string>(selectedUsername || '');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -184,22 +189,71 @@ const Messages = () => {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'Ошибка',
+          description: 'Размер файла не должен превышать 5 МБ',
+          variant: 'destructive'
+        });
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview('');
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !activeConversation || !newMessage.trim()) return;
+    if (!user || !activeConversation || (!newMessage.trim() && !selectedImage)) return;
 
+    setUploading(true);
     try {
+      let imageUrl = null;
+
+      // Upload image if selected
+      if (selectedImage) {
+        const fileExt = selectedImage.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${user.id}/messages/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media-images')
+          .upload(filePath, selectedImage);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media-images')
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrl;
+      }
+
       const { error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           receiver_id: activeConversation,
-          content: newMessage.trim()
+          content: newMessage.trim() || '',
+          image_url: imageUrl
         });
 
       if (error) throw error;
 
       setNewMessage('');
+      removeImage();
       fetchMessages(activeConversation);
       fetchConversations();
     } catch (error) {
@@ -209,6 +263,8 @@ const Messages = () => {
         description: 'Не удалось отправить сообщение',
         variant: 'destructive'
       });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -324,7 +380,15 @@ const Messages = () => {
                           : 'bg-muted'
                       }`}
                     >
-                      <p className="break-words">{msg.content}</p>
+                      {msg.image_url && (
+                        <img
+                          src={msg.image_url}
+                          alt="Attached"
+                          className="rounded-lg mb-2 max-w-full h-auto cursor-pointer"
+                          onClick={() => window.open(msg.image_url!, '_blank')}
+                        />
+                      )}
+                      {msg.content && <p className="break-words">{msg.content}</p>}
                       <p
                         className={`text-xs mt-1 ${
                           msg.sender_id === user.id
@@ -342,16 +406,56 @@ const Messages = () => {
                 ))}
               </div>
             </ScrollArea>
-            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2">
-              <Input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Введите сообщение..."
-                className="flex-1"
-              />
-              <Button type="submit" size="icon" disabled={!newMessage.trim()}>
-                <Send className="w-4 h-4" />
-              </Button>
+            <form onSubmit={sendMessage} className="p-4 border-t space-y-2">
+              {imagePreview && (
+                <div className="relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-32 h-32 object-cover rounded-lg"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 w-6 h-6"
+                    onClick={removeImage}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Введите сообщение..."
+                  className="flex-1"
+                  disabled={uploading}
+                />
+                <Label htmlFor="message-image" className="cursor-pointer">
+                  <Button type="button" variant="outline" size="icon" asChild disabled={uploading}>
+                    <div>
+                      <ImageIcon className="w-4 h-4" />
+                      <input
+                        id="message-image"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageSelect}
+                        disabled={uploading}
+                      />
+                    </div>
+                  </Button>
+                </Label>
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={(!newMessage.trim() && !selectedImage) || uploading}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

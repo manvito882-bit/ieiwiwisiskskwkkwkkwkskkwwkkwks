@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Play, Radio, Eye, Trash2, User, MessageSquare, Flame } from 'lucide-react';
+import { Upload, Play, Radio, Eye, Trash2, User, MessageSquare, Flame, Lock } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LiveStream } from '@/components/LiveStream';
 import { LiveStreamViewer } from '@/components/LiveStreamViewer';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +26,9 @@ interface MediaItem {
   post_id?: string | null;
   likes_count?: number;
   isLiked?: boolean;
+  view_condition?: 'none' | 'like' | 'comment';
+  hasCommented?: boolean;
+  canView?: boolean;
   profiles?: {
     username: string;
   } | null;
@@ -35,7 +39,12 @@ const VideoSection = () => {
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadData, setUploadData] = useState({ title: '', description: '', file: null as File | null });
+  const [uploadData, setUploadData] = useState({ 
+    title: '', 
+    description: '', 
+    file: null as File | null,
+    viewCondition: 'none' as 'none' | 'like' | 'comment'
+  });
   const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
   const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
@@ -116,29 +125,47 @@ const VideoSection = () => {
       const [{ data: profilesData }, { data: postsData }] = await Promise.all([
         supabase.from('profiles').select('user_id, username').in('user_id', userIds),
         postIds.length > 0 
-          ? supabase.from('posts').select('id, likes_count').in('id', postIds)
+          ? supabase.from('posts').select('id, likes_count, view_condition').in('id', postIds)
           : Promise.resolve({ data: [] })
       ]);
 
-      // Получаем лайки пользователя если он авторизован
+      // Получаем лайки и комментарии пользователя если он авторизован
       let userLikes: string[] = [];
+      let userComments: string[] = [];
       if (user && postIds.length > 0) {
-        const { data: likesData } = await supabase
-          .from('post_likes')
-          .select('post_id')
-          .eq('user_id', user.id)
-          .in('post_id', postIds);
+        const [{ data: likesData }, { data: commentsData }] = await Promise.all([
+          supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+          supabase.from('comments').select('post_id').eq('user_id', user.id).in('post_id', postIds)
+        ]);
         userLikes = likesData?.map(like => like.post_id) || [];
+        userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
       }
 
       // Объединяем данные
       const videosWithData = videosData?.map(video => {
         const post = postsData?.find(p => p.id === video.post_id);
+        const isLiked = video.post_id ? userLikes.includes(video.post_id) : false;
+        const hasCommented = video.post_id ? userComments.includes(video.post_id) : false;
+        const isOwner = user?.id === video.user_id;
+        
+        // Определяем можно ли просматривать контент
+        let canView = true;
+        if (!isOwner && post?.view_condition && post.view_condition !== 'none') {
+          if (post.view_condition === 'like' && !isLiked) {
+            canView = false;
+          } else if (post.view_condition === 'comment' && !hasCommented) {
+            canView = false;
+          }
+        }
+        
         return {
           ...video,
           profiles: profilesData?.find(p => p.user_id === video.user_id) || null,
           likes_count: post?.likes_count || 0,
-          isLiked: video.post_id ? userLikes.includes(video.post_id) : false
+          view_condition: post?.view_condition || 'none',
+          isLiked,
+          hasCommented,
+          canView
         };
       });
 
@@ -215,7 +242,8 @@ const VideoSection = () => {
           user_id: user.id,
           title: uploadData.title,
           content: uploadData.description,
-          category: 'media'
+          category: 'media',
+          view_condition: uploadData.viewCondition
         })
         .select()
         .single();
@@ -259,7 +287,7 @@ const VideoSection = () => {
         description: "Видео загружено успешно",
       });
 
-      setUploadData({ title: '', description: '', file: null });
+      setUploadData({ title: '', description: '', file: null, viewCondition: 'none' });
       fetchVideos();
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -329,6 +357,27 @@ const VideoSection = () => {
                     className="border-lavender-light focus:ring-lavender"
                     rows={3}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="view-condition">Условие просмотра</Label>
+                  <Select
+                    value={uploadData.viewCondition}
+                    onValueChange={(value: 'none' | 'like' | 'comment') => 
+                      setUploadData({ ...uploadData, viewCondition: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Без условий (свободный просмотр)</SelectItem>
+                      <SelectItem value="like">Требуется лайк 🔥</SelectItem>
+                      <SelectItem value="comment">Требуется комментарий 💬</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Выберите условие для доступа к вашим видео
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="video-file">Видео файл</Label>
@@ -422,15 +471,26 @@ const VideoSection = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {videos.map((video) => (
             <Card key={video.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-gray-100">
-                <video
-                  src={video.file_url}
-                  controls
-                  className="w-full h-full object-cover"
-                  preload="metadata"
-                >
-                  Ваш браузер не поддерживает воспроизведение видео.
-                </video>
+              <div className="aspect-video bg-gray-100 relative">
+                {video.canView ? (
+                  <video
+                    src={video.file_url}
+                    controls
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                  >
+                    Ваш браузер не поддерживает воспроизведение видео.
+                  </video>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
+                    <Lock className="w-16 h-16 mb-4 text-muted-foreground" />
+                    <p className="text-center font-semibold px-4">
+                      {video.view_condition === 'like' 
+                        ? 'Поставьте лайк 🔥 чтобы просмотреть видео' 
+                        : 'Оставьте комментарий 💬 чтобы просмотреть видео'}
+                    </p>
+                  </div>
+                )}
               </div>
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-start mb-2">
