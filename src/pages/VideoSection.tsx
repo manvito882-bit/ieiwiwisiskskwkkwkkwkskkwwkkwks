@@ -26,8 +26,9 @@ interface MediaItem {
   post_id?: string | null;
   likes_count?: number;
   isLiked?: boolean;
-  view_condition?: 'none' | 'like' | 'comment';
+  view_condition?: 'none' | 'like' | 'comment' | 'subscription';
   hasCommented?: boolean;
+  isSubscribed?: boolean;
   canView?: boolean;
   profiles?: {
     username: string;
@@ -43,7 +44,7 @@ const VideoSection = () => {
     title: '', 
     description: '', 
     file: null as File | null,
-    viewCondition: 'none' as 'none' | 'like' | 'comment'
+    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription'
   });
   const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
   const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
@@ -129,16 +130,24 @@ const VideoSection = () => {
           : Promise.resolve({ data: [] })
       ]);
 
-      // Получаем лайки и комментарии пользователя если он авторизован
+      // Получаем лайки, комментарии и подписки пользователя если он авторизован
       let userLikes: string[] = [];
       let userComments: string[] = [];
-      if (user && postIds.length > 0) {
-        const [{ data: likesData }, { data: commentsData }] = await Promise.all([
-          supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
-          supabase.from('comments').select('post_id').eq('user_id', user.id).in('post_id', postIds)
-        ]);
+      let userSubscriptions: string[] = [];
+      if (user) {
+        const promises = [
+          postIds.length > 0 
+            ? supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds)
+            : Promise.resolve({ data: [] }),
+          postIds.length > 0
+            ? supabase.from('comments').select('post_id').eq('user_id', user.id).in('post_id', postIds)
+            : Promise.resolve({ data: [] }),
+          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id)
+        ];
+        const [{ data: likesData }, { data: commentsData }, { data: subsData }] = await Promise.all(promises);
         userLikes = likesData?.map(like => like.post_id) || [];
         userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
+        userSubscriptions = subsData?.map(sub => sub.subscribed_to_id) || [];
       }
 
       // Объединяем данные
@@ -146,6 +155,7 @@ const VideoSection = () => {
         const post = postsData?.find(p => p.id === video.post_id);
         const isLiked = video.post_id ? userLikes.includes(video.post_id) : false;
         const hasCommented = video.post_id ? userComments.includes(video.post_id) : false;
+        const isSubscribed = userSubscriptions.includes(video.user_id);
         const isOwner = user?.id === video.user_id;
         
         // Определяем можно ли просматривать контент
@@ -154,6 +164,8 @@ const VideoSection = () => {
           if (post.view_condition === 'like' && !isLiked) {
             canView = false;
           } else if (post.view_condition === 'comment' && !hasCommented) {
+            canView = false;
+          } else if (post.view_condition === 'subscription' && !isSubscribed) {
             canView = false;
           }
         }
@@ -165,6 +177,7 @@ const VideoSection = () => {
           view_condition: post?.view_condition || 'none',
           isLiked,
           hasCommented,
+          isSubscribed,
           canView
         };
       });
@@ -362,7 +375,7 @@ const VideoSection = () => {
                   <Label htmlFor="view-condition">Условие просмотра</Label>
                   <Select
                     value={uploadData.viewCondition}
-                    onValueChange={(value: 'none' | 'like' | 'comment') => 
+                    onValueChange={(value: 'none' | 'like' | 'comment' | 'subscription') => 
                       setUploadData({ ...uploadData, viewCondition: value })
                     }
                   >
@@ -373,6 +386,7 @@ const VideoSection = () => {
                       <SelectItem value="none">Без условий (свободный просмотр)</SelectItem>
                       <SelectItem value="like">Требуется лайк 🔥</SelectItem>
                       <SelectItem value="comment">Требуется комментарий 💬</SelectItem>
+                      <SelectItem value="subscription">Требуется подписка 👤</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -485,9 +499,9 @@ const VideoSection = () => {
                   <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
                     <Lock className="w-16 h-16 mb-4 text-muted-foreground" />
                     <p className="text-center font-semibold px-4">
-                      {video.view_condition === 'like' 
-                        ? 'Поставьте лайк 🔥 чтобы просмотреть видео' 
-                        : 'Оставьте комментарий 💬 чтобы просмотреть видео'}
+                      {video.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть видео'}
+                      {video.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть видео'}
+                      {video.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть видео'}
                     </p>
                   </div>
                 )}

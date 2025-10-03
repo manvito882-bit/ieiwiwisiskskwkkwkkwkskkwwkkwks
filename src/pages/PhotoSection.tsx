@@ -31,13 +31,14 @@ interface Post {
   created_at: string;
   user_id: string;
   likes_count: number;
-  view_condition: 'none' | 'like' | 'comment';
+  view_condition: 'none' | 'like' | 'comment' | 'subscription';
   media: MediaItem[];
   profiles?: {
     username: string;
   } | null;
   isLiked?: boolean;
   hasCommented?: boolean;
+  isSubscribed?: boolean;
   canView?: boolean;
 }
 
@@ -49,7 +50,7 @@ const PhotoSection = () => {
     title: '', 
     description: '', 
     files: [] as File[], 
-    viewCondition: 'none' as 'none' | 'like' | 'comment'
+    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription'
   });
   const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
@@ -141,22 +142,26 @@ const PhotoSection = () => {
         .select('user_id, username')
         .in('user_id', userIds);
 
-      // Получаем лайки и комментарии пользователя если он авторизован
+      // Получаем лайки, комментарии и подписки пользователя если он авторизован
       let userLikes: string[] = [];
       let userComments: string[] = [];
+      let userSubscriptions: string[] = [];
       if (user) {
-        const [{ data: likesData }, { data: commentsData }] = await Promise.all([
+        const [{ data: likesData }, { data: commentsData }, { data: subsData }] = await Promise.all([
           supabase.from('post_likes').select('post_id').eq('user_id', user.id),
-          supabase.from('comments').select('post_id').eq('user_id', user.id)
+          supabase.from('comments').select('post_id').eq('user_id', user.id),
+          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id)
         ]);
         userLikes = likesData?.map(like => like.post_id) || [];
         userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
+        userSubscriptions = subsData?.map(sub => sub.subscribed_to_id) || [];
       }
 
       // Объединяем данные
       const postsWithProfiles = postsData?.map(post => {
         const isLiked = userLikes.includes(post.id);
         const hasCommented = userComments.includes(post.id);
+        const isSubscribed = userSubscriptions.includes(post.user_id);
         const isOwner = user?.id === post.user_id;
         
         // Определяем можно ли просматривать контент
@@ -166,6 +171,8 @@ const PhotoSection = () => {
             canView = false;
           } else if (post.view_condition === 'comment' && !hasCommented) {
             canView = false;
+          } else if (post.view_condition === 'subscription' && !isSubscribed) {
+            canView = false;
           }
         }
 
@@ -174,6 +181,7 @@ const PhotoSection = () => {
           profiles: profilesData?.find(p => p.user_id === post.user_id) || null,
           isLiked,
           hasCommented,
+          isSubscribed,
           canView
         };
       });
@@ -320,7 +328,7 @@ const PhotoSection = () => {
                   <Label htmlFor="view-condition">Условие просмотра</Label>
                   <Select
                     value={uploadData.viewCondition}
-                    onValueChange={(value: 'none' | 'like' | 'comment') => 
+                    onValueChange={(value: 'none' | 'like' | 'comment' | 'subscription') => 
                       setUploadData({ ...uploadData, viewCondition: value })
                     }
                   >
@@ -331,6 +339,7 @@ const PhotoSection = () => {
                       <SelectItem value="none">Без условий (свободный просмотр)</SelectItem>
                       <SelectItem value="like">Требуется лайк 🔥</SelectItem>
                       <SelectItem value="comment">Требуется комментарий 💬</SelectItem>
+                      <SelectItem value="subscription">Требуется подписка 👤</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -422,9 +431,9 @@ const PhotoSection = () => {
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
                                 <Lock className="w-12 h-12 mb-2" />
                                 <p className="text-center font-semibold">
-                                  {post.view_condition === 'like' 
-                                    ? 'Поставьте лайк 🔥 чтобы просмотреть' 
-                                    : 'Оставьте комментарий 💬 чтобы просмотреть'}
+                                  {post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                                  {post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                                  {post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
                                 </p>
                               </div>
                             )}
@@ -450,9 +459,9 @@ const PhotoSection = () => {
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
                         <Lock className="w-12 h-12 mb-2" />
                         <p className="text-center font-semibold text-sm">
-                          {post.view_condition === 'like' 
-                            ? 'Поставьте лайк 🔥 чтобы просмотреть' 
-                            : 'Оставьте комментарий 💬 чтобы просмотреть'}
+                          {post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                          {post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                          {post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
                         </p>
                       </div>
                     )}

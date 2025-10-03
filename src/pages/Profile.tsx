@@ -4,14 +4,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { User, Video, Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { User, Video, Image as ImageIcon, ArrowLeft, UserPlus, UserMinus, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
   user_id: string;
   username: string;
   created_at: string;
+  subscribers_count: number;
 }
 
 interface MediaItem {
@@ -26,9 +29,13 @@ interface MediaItem {
 const Profile = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,6 +50,18 @@ const Profile = () => {
 
         if (profileError) throw profileError;
         setProfile(profileData);
+
+        // Check if current user is subscribed
+        if (user && user.id !== profileData.user_id) {
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('subscriber_id', user.id)
+            .eq('subscribed_to_id', profileData.user_id)
+            .single();
+          
+          setIsSubscribed(!!subData);
+        }
 
         const { data: mediaData, error: mediaError } = await supabase
           .from('media')
@@ -60,7 +79,80 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [username]);
+  }, [username, user]);
+
+  const toggleSubscription = async () => {
+    if (!user || !profile) {
+      toast({
+        title: 'Ошибка',
+        description: 'Войдите в систему',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      if (isSubscribed) {
+        const { error } = await supabase
+          .from('subscriptions')
+          .delete()
+          .eq('subscriber_id', user.id)
+          .eq('subscribed_to_id', profile.user_id);
+
+        if (error) throw error;
+        
+        setIsSubscribed(false);
+        setProfile(prev => prev ? { ...prev, subscribers_count: prev.subscribers_count - 1 } : null);
+        toast({
+          title: 'Успешно',
+          description: 'Вы отписались'
+        });
+      } else {
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert({
+            subscriber_id: user.id,
+            subscribed_to_id: profile.user_id
+          });
+
+        if (error) throw error;
+
+        setIsSubscribed(true);
+        setProfile(prev => prev ? { ...prev, subscribers_count: prev.subscribers_count + 1 } : null);
+        toast({
+          title: 'Успешно',
+          description: 'Вы подписались'
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling subscription:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить подписку',
+        variant: 'destructive'
+      });
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const handleMessage = () => {
+    if (!user) {
+      toast({
+        title: 'Ошибка',
+        description: 'Войдите в систему',
+        variant: 'destructive'
+      });
+      return;
+    }
+    navigate('/messages', { 
+      state: { 
+        selectedUserId: profile?.user_id, 
+        selectedUsername: profile?.username 
+      } 
+    });
+  };
 
   if (loading) {
     return (
@@ -94,19 +186,49 @@ const Profile = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-lavender-light rounded-full flex items-center justify-center">
-              <User className="w-10 h-10 text-lavender" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 bg-lavender-light rounded-full flex items-center justify-center">
+                <User className="w-10 h-10 text-lavender" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">{profile.username}</h1>
+                <p className="text-muted-foreground">
+                  На платформе {formatDistanceToNow(new Date(profile.created_at), {
+                    addSuffix: true,
+                    locale: ru
+                  })}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Подписчиков: {profile.subscribers_count}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">{profile.username}</h1>
-              <p className="text-muted-foreground">
-                На платформе {formatDistanceToNow(new Date(profile.created_at), {
-                  addSuffix: true,
-                  locale: ru
-                })}
-              </p>
-            </div>
+            {user && user.id !== profile.user_id && (
+              <div className="flex gap-2">
+                <Button
+                  variant={isSubscribed ? "outline" : "default"}
+                  onClick={toggleSubscription}
+                  disabled={subscribing}
+                >
+                  {isSubscribed ? (
+                    <>
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Отписаться
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Подписаться
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={handleMessage}>
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Сообщение
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>

@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, ArrowLeft, Image as ImageIcon, X } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Send, ArrowLeft, Image as ImageIcon, X, User } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 interface Message {
   id: string;
@@ -325,22 +328,32 @@ const Messages = () => {
                       activeConversation === conv.user_id ? 'bg-muted' : ''
                     }`}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-lavender-light text-lavender">
+                          <User className="w-5 h-5" />
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{conv.username}</p>
+                        <div className="flex justify-between items-start">
+                          <p className="font-medium truncate">{conv.username}</p>
+                          {conv.unread_count > 0 && (
+                            <span className="ml-2 px-2 py-1 bg-primary text-primary-foreground text-xs rounded-full">
+                              {conv.unread_count}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">
                           {conv.last_message}
                         </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDistanceToNow(new Date(conv.last_message_time), {
+                            addSuffix: true,
+                            locale: ru
+                          })}
+                        </p>
                       </div>
-                      {conv.unread_count > 0 && (
-                        <span className="ml-2 px-2 py-1 bg-primary text-primary-foreground text-xs rounded-full">
-                          {conv.unread_count}
-                        </span>
-                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(conv.last_message_time).toLocaleDateString('ru-RU')}
-                    </p>
                   </button>
                 ))}
               </div>
@@ -352,15 +365,20 @@ const Messages = () => {
       {/* Messages */}
       {activeConversation ? (
         <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center space-y-0">
+          <CardHeader className="flex flex-row items-center space-y-0 gap-3 border-b">
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden mr-2"
+              className="md:hidden"
               onClick={() => setActiveConversation(null)}
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
+            <Avatar className="w-10 h-10">
+              <AvatarFallback className="bg-lavender-light text-lavender">
+                <User className="w-5 h-5" />
+              </AvatarFallback>
+            </Avatar>
             <CardTitle>{activeUsername}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
