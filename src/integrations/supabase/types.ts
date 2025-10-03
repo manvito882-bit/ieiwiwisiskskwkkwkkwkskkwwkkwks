@@ -261,6 +261,7 @@ export type Database = {
           created_at: string
           id: string
           is_18_confirmed: boolean
+          subscribers_count: number
           updated_at: string
           user_id: string
           username: string
@@ -269,6 +270,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_18_confirmed?: boolean
+          subscribers_count?: number
           updated_at?: string
           user_id: string
           username: string
@@ -277,9 +279,31 @@ export type Database = {
           created_at?: string
           id?: string
           is_18_confirmed?: boolean
+          subscribers_count?: number
           updated_at?: string
           user_id?: string
           username?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          subscribed_to_id: string
+          subscriber_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          subscribed_to_id: string
+          subscriber_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          subscribed_to_id?: string
+          subscriber_id?: string
         }
         Relationships: []
       }
@@ -294,7 +318,7 @@ export type Database = {
       }
     }
     Enums: {
-      view_condition: "none" | "like" | "comment"
+      view_condition: "none" | "like" | "comment" | "subscription"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -422,7 +446,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      view_condition: ["none", "like", "comment"],
+      view_condition: ["none", "like", "comment", "subscription"],
     },
   },
 } as const
