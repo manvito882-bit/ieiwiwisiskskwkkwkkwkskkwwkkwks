@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle } from 'lucide-react';
 import UserSearch from '@/components/UserSearch';
+import { Notifications } from '@/components/Notifications';
 
 const Layout = () => {
   const { user, signOut } = useAuth();
@@ -72,6 +73,7 @@ const Layout = () => {
             <div className="flex items-center space-x-4">
               {user && (
                 <>
+                  <Notifications />
                   <Badge variant="outline" className="border-lavender text-lavender">
                     <User className="w-3 h-3 mr-1" />
                     {user.user_metadata?.username || 'Пользователь'}
