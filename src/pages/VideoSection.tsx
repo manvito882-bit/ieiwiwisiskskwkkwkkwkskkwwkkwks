@@ -15,6 +15,7 @@ import { LiveStreamViewer } from '@/components/LiveStreamViewer';
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PasswordPrompt } from '@/components/PasswordPrompt';
 
 interface MediaItem {
   id: string;
@@ -30,6 +31,8 @@ interface MediaItem {
   hasCommented?: boolean;
   isSubscribed?: boolean;
   canView?: boolean;
+  password?: string | null;
+  passwordVerified?: boolean;
   profiles?: {
     username: string;
   } | null;
@@ -44,11 +47,16 @@ const VideoSection = () => {
     title: '', 
     description: '', 
     file: null as File | null,
-    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription'
+    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription',
+    password: ''
   });
   const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
   const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
+  const [passwordPrompt, setPasswordPrompt] = useState<{ isOpen: boolean; videoId: string | null }>({ 
+    isOpen: false, 
+    videoId: null 
+  });
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -101,6 +109,49 @@ const VideoSection = () => {
         description: "Не удалось обновить лайк",
         variant: "destructive"
       });
+    }
+  };
+
+  const handlePasswordSubmit = (videoId: string, password: string) => {
+    const video = videos.find(v => v.id === videoId);
+    if (!video || !video.password) return;
+
+    if (password === video.password) {
+      setVideos(videos.map(v => 
+        v.id === videoId 
+          ? { ...v, passwordVerified: true }
+          : v
+      ));
+      setPasswordPrompt({ isOpen: false, videoId: null });
+      toast({
+        title: "Успешно",
+        description: "Пароль принят",
+      });
+    } else {
+      toast({
+        title: "Ошибка",
+        description: "Неверный пароль",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const canPlayVideo = (video: MediaItem): boolean => {
+    const isOwner = user?.id === video.user_id;
+    if (isOwner) return true;
+    if (!video.canView) return false;
+    if (video.password && !video.passwordVerified) return false;
+    return true;
+  };
+
+  const handleVideoClick = (video: MediaItem) => {
+    const isOwner = user?.id === video.user_id;
+    
+    if (isOwner) return; // Владелец может смотреть без ограничений
+    if (!video.canView) return; // Не выполнены условия
+    
+    if (video.password && !video.passwordVerified) {
+      setPasswordPrompt({ isOpen: true, videoId: video.id });
     }
   };
 
@@ -175,10 +226,12 @@ const VideoSection = () => {
           profiles: profilesData?.find(p => p.user_id === video.user_id) || null,
           likes_count: post?.likes_count || 0,
           view_condition: post?.view_condition || 'none',
+          password: post?.password || null,
           isLiked,
           hasCommented,
           isSubscribed,
-          canView
+          canView,
+          passwordVerified: false
         };
       });
 
@@ -256,7 +309,8 @@ const VideoSection = () => {
           title: uploadData.title,
           content: uploadData.description,
           category: 'media',
-          view_condition: uploadData.viewCondition
+          view_condition: uploadData.viewCondition,
+          password: uploadData.password || null
         })
         .select()
         .single();
@@ -300,7 +354,7 @@ const VideoSection = () => {
         description: "Видео загружено успешно",
       });
 
-      setUploadData({ title: '', description: '', file: null, viewCondition: 'none' });
+      setUploadData({ title: '', description: '', file: null, viewCondition: 'none', password: '' });
       fetchVideos();
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -391,6 +445,20 @@ const VideoSection = () => {
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     Выберите условие для доступа к вашим видео
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="video-password">Пароль (необязательно)</Label>
+                  <Input
+                    id="video-password"
+                    type="password"
+                    value={uploadData.password}
+                    onChange={(e) => setUploadData({ ...uploadData, password: e.target.value })}
+                    placeholder="Оставьте пустым для открытого доступа"
+                    className="border-lavender-light focus:ring-lavender"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Установите пароль для дополнительной защиты контента
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -486,22 +554,27 @@ const VideoSection = () => {
           {videos.map((video) => (
             <Card key={video.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
               <div className="aspect-video bg-gray-100 relative">
-                {video.canView ? (
+                {canPlayVideo(video) ? (
                   <video
                     src={video.file_url}
                     controls
                     className="w-full h-full object-cover"
                     preload="metadata"
+                    onClick={() => handleVideoClick(video)}
                   >
                     Ваш браузер не поддерживает воспроизведение видео.
                   </video>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
+                  <div 
+                    className="w-full h-full flex flex-col items-center justify-center bg-muted cursor-pointer"
+                    onClick={() => handleVideoClick(video)}
+                  >
                     <Lock className="w-16 h-16 mb-4 text-muted-foreground" />
                     <p className="text-center font-semibold px-4">
-                      {video.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть видео'}
-                      {video.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть видео'}
-                      {video.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть видео'}
+                      {!video.canView && video.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть видео'}
+                      {!video.canView && video.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть видео'}
+                      {!video.canView && video.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть видео'}
+                      {video.canView && video.password && !video.passwordVerified && '🔒 Защищено паролем'}
                     </p>
                   </div>
                 )}
@@ -572,6 +645,12 @@ const VideoSection = () => {
           ))}
         </div>
       )}
+
+      <PasswordPrompt
+        isOpen={passwordPrompt.isOpen}
+        onClose={() => setPasswordPrompt({ isOpen: false, videoId: null })}
+        onSubmit={(password) => passwordPrompt.videoId && handlePasswordSubmit(passwordPrompt.videoId, password)}
+      />
     </div>
   );
 };

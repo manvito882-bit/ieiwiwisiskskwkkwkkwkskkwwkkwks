@@ -14,6 +14,7 @@ import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame, Lock } from 'luci
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PasswordPrompt } from '@/components/PasswordPrompt';
 
 interface MediaItem {
   id: string;
@@ -32,6 +33,7 @@ interface Post {
   user_id: string;
   likes_count: number;
   view_condition: 'none' | 'like' | 'comment' | 'subscription';
+  password?: string | null;
   media: MediaItem[];
   profiles?: {
     username: string;
@@ -40,6 +42,7 @@ interface Post {
   hasCommented?: boolean;
   isSubscribed?: boolean;
   canView?: boolean;
+  passwordVerified?: boolean;
 }
 
 const PhotoSection = () => {
@@ -50,10 +53,15 @@ const PhotoSection = () => {
     title: '', 
     description: '', 
     files: [] as File[], 
-    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription'
+    viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription',
+    password: ''
   });
   const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
+  const [passwordPrompt, setPasswordPrompt] = useState<{ isOpen: boolean; postId: string | null }>({ 
+    isOpen: false, 
+    postId: null 
+  });
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -108,6 +116,54 @@ const PhotoSection = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handlePasswordSubmit = (postId: string, password: string) => {
+    const post = posts.find(p => p.id === postId);
+    if (!post || !post.password) return;
+
+    if (password === post.password) {
+      setPosts(posts.map(p => 
+        p.id === postId 
+          ? { ...p, passwordVerified: true }
+          : p
+      ));
+      setPasswordPrompt({ isOpen: false, postId: null });
+      toast({
+        title: "Успешно",
+        description: "Пароль принят",
+      });
+    } else {
+      toast({
+        title: "Ошибка",
+        description: "Неверный пароль",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleMediaClick = (post: Post, index: number = 0) => {
+    const isOwner = user?.id === post.user_id;
+    
+    // Владелец может просматривать без ограничений
+    if (isOwner) {
+      setSelectedMedia({ media: post.media, currentIndex: index });
+      return;
+    }
+
+    // Проверка условий просмотра
+    if (!post.canView) {
+      return; // Не выполнены условия (лайк/комментарий/подписка)
+    }
+
+    // Проверка пароля
+    if (post.password && !post.passwordVerified) {
+      setPasswordPrompt({ isOpen: true, postId: post.id });
+      return;
+    }
+
+    // Все проверки пройдены - открываем медиа
+    setSelectedMedia({ media: post.media, currentIndex: index });
   };
 
   useEffect(() => {
@@ -182,7 +238,8 @@ const PhotoSection = () => {
           isLiked,
           hasCommented,
           isSubscribed,
-          canView
+          canView,
+          passwordVerified: false
         };
       });
 
@@ -213,7 +270,8 @@ const PhotoSection = () => {
           title: uploadData.title,
           content: uploadData.description,
           category: 'media',
-          view_condition: uploadData.viewCondition
+          view_condition: uploadData.viewCondition,
+          password: uploadData.password || null
         })
         .select()
         .single();
@@ -261,7 +319,7 @@ const PhotoSection = () => {
         description: `Пост с ${uploadData.files.length} фотографиями создан успешно`,
       });
 
-      setUploadData({ title: '', description: '', files: [], viewCondition: 'none' });
+      setUploadData({ title: '', description: '', files: [], viewCondition: 'none', password: '' });
       fetchPosts();
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -347,6 +405,20 @@ const PhotoSection = () => {
                   </p>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="password">Пароль (необязательно)</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={uploadData.password}
+                    onChange={(e) => setUploadData({ ...uploadData, password: e.target.value })}
+                    placeholder="Оставьте пустым для открытого доступа"
+                    className="border-lavender-light focus:ring-lavender"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Установите пароль для дополнительной защиты контента
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="photo-file">Изображения (до 10 файлов)</Label>
                   <Input
                     id="photo-file"
@@ -417,23 +489,24 @@ const PhotoSection = () => {
                     <CarouselContent>
                       {post.media.map((media, index) => (
                         <CarouselItem key={media.id}>
-                          <div className="relative w-full h-full">
+                           <div className="relative w-full h-full">
                             <img
                               src={media.file_url}
                               alt={media.title}
                               className={`w-full h-full object-cover cursor-pointer ${
-                                !post.canView ? 'blur-xl' : ''
+                                (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
                               }`}
                               loading="lazy"
-                              onClick={() => post.canView && setSelectedMedia({ media: post.media, currentIndex: index })}
+                              onClick={() => handleMediaClick(post, index)}
                             />
-                            {!post.canView && (
+                            {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
                                 <Lock className="w-12 h-12 mb-2" />
                                 <p className="text-center font-semibold">
-                                  {post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
-                                  {post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
-                                  {post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                                  {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                                  {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                                  {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                                  {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
                                 </p>
                               </div>
                             )}
@@ -450,18 +523,19 @@ const PhotoSection = () => {
                       src={post.media[0].file_url}
                       alt={post.media[0].title}
                       className={`w-full h-full object-cover cursor-pointer ${
-                        !post.canView ? 'blur-xl' : ''
+                        (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
                       }`}
                       loading="lazy"
-                      onClick={() => post.canView && setSelectedMedia({ media: post.media, currentIndex: 0 })}
+                      onClick={() => handleMediaClick(post, 0)}
                     />
-                    {!post.canView && (
+                    {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
                         <Lock className="w-12 h-12 mb-2" />
                         <p className="text-center font-semibold text-sm">
-                          {post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
-                          {post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
-                          {post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                          {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                          {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                          {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                          {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
                         </p>
                       </div>
                     )}
@@ -477,7 +551,7 @@ const PhotoSection = () => {
                 <Button
                   size="sm"
                   className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 text-white"
-                  onClick={() => setSelectedMedia({ media: post.media, currentIndex: 0 })}
+                  onClick={() => handleMediaClick(post, 0)}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
@@ -602,6 +676,12 @@ const PhotoSection = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <PasswordPrompt
+        isOpen={passwordPrompt.isOpen}
+        onClose={() => setPasswordPrompt({ isOpen: false, postId: null })}
+        onSubmit={(password) => passwordPrompt.postId && handlePasswordSubmit(passwordPrompt.postId, password)}
+      />
     </div>
   );
 };

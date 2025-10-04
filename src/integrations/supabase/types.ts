@@ -101,6 +101,7 @@ export type Database = {
           file_type: string
           file_url: string
           id: string
+          password: string | null
           post_id: string | null
           title: string
           updated_at: string
@@ -114,6 +115,7 @@ export type Database = {
           file_type: string
           file_url: string
           id?: string
+          password?: string | null
           post_id?: string | null
           title: string
           updated_at?: string
@@ -127,6 +129,7 @@ export type Database = {
           file_type?: string
           file_url?: string
           id?: string
+          password?: string | null
           post_id?: string | null
           title?: string
           updated_at?: string
@@ -281,6 +284,7 @@ export type Database = {
           id: string
           image_url: string | null
           likes_count: number
+          password: string | null
           tags: string[] | null
           title: string
           updated_at: string
@@ -295,6 +299,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           likes_count?: number
+          password?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
@@ -309,6 +314,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           likes_count?: number
+          password?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
