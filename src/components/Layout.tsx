@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle } from 'lucide-react';
+import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins } from 'lucide-react';
 import UserSearch from '@/components/UserSearch';
 import { Notifications } from '@/components/Notifications';
+import { TokenBalance } from '@/components/TokenBalance';
 
 const Layout = () => {
   const { user, signOut } = useAuth();
@@ -67,6 +68,15 @@ const Layout = () => {
                   <MessageCircle className="w-4 h-4 mr-2" />
                   Сообщения
                 </Button>
+                <Button
+                  variant={isActive('/tokens') ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => navigate('/tokens')}
+                  className={isActive('/tokens') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+                >
+                  <Coins className="w-4 h-4 mr-2" />
+                  Токены
+                </Button>
               </nav>
             </div>
             
@@ -74,6 +84,7 @@ const Layout = () => {
               {user && (
                 <>
                   <Notifications />
+                  <TokenBalance />
                   <Badge variant="outline" className="border-lavender text-lavender">
                     <User className="w-3 h-3 mr-1" />
                     {user.user_metadata?.username || 'Пользователь'}

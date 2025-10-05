@@ -461,6 +461,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_tokens: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       is_username_available: {
         Args: { username_param: string }
         Returns: boolean

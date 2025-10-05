@@ -34,6 +34,7 @@ interface Post {
   likes_count: number;
   view_condition: 'none' | 'like' | 'comment' | 'subscription';
   password?: string | null;
+  token_cost?: number;
   media: MediaItem[];
   profiles?: {
     username: string;
@@ -43,6 +44,7 @@ interface Post {
   isSubscribed?: boolean;
   canView?: boolean;
   passwordVerified?: boolean;
+  tokenUnlocked?: boolean;
 }
 
 const PhotoSection = () => {
@@ -54,7 +56,8 @@ const PhotoSection = () => {
     description: '', 
     files: [] as File[], 
     viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription',
-    password: ''
+    password: '',
+    tokenCost: '0'
   });
   const [selectedMedia, setSelectedMedia] = useState<{ media: MediaItem[], currentIndex: number } | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
@@ -263,6 +266,7 @@ const PhotoSection = () => {
     setUploading(true);
     try {
       // First create a post
+      const tokenCostValue = parseFloat(uploadData.tokenCost) || 0;
       const { data: postData, error: postError } = await supabase
         .from('posts')
         .insert({
@@ -271,7 +275,8 @@ const PhotoSection = () => {
           content: uploadData.description,
           category: 'media',
           view_condition: uploadData.viewCondition,
-          password: uploadData.password || null
+          password: uploadData.password || null,
+          token_cost: tokenCostValue
         })
         .select()
         .single();
@@ -319,7 +324,7 @@ const PhotoSection = () => {
         description: `Пост с ${uploadData.files.length} фотографиями создан успешно`,
       });
 
-      setUploadData({ title: '', description: '', files: [], viewCondition: 'none', password: '' });
+      setUploadData({ title: '', description: '', files: [], viewCondition: 'none', password: '', tokenCost: '0' });
       fetchPosts();
     } catch (error) {
       console.error('Error uploading photos:', error);
