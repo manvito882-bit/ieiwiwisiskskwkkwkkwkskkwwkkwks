@@ -104,6 +104,7 @@ export type Database = {
           password: string | null
           post_id: string | null
           title: string
+          token_cost: number | null
           updated_at: string
           user_id: string
         }
@@ -118,6 +119,7 @@ export type Database = {
           password?: string | null
           post_id?: string | null
           title: string
+          token_cost?: number | null
           updated_at?: string
           user_id: string
         }
@@ -132,6 +134,7 @@ export type Database = {
           password?: string | null
           post_id?: string | null
           title?: string
+          token_cost?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -287,6 +290,7 @@ export type Database = {
           password: string | null
           tags: string[] | null
           title: string
+          token_cost: number | null
           updated_at: string
           user_id: string
           view_condition: Database["public"]["Enums"]["view_condition"]
@@ -302,6 +306,7 @@ export type Database = {
           password?: string | null
           tags?: string[] | null
           title: string
+          token_cost?: number | null
           updated_at?: string
           user_id: string
           view_condition?: Database["public"]["Enums"]["view_condition"]
@@ -317,6 +322,7 @@ export type Database = {
           password?: string | null
           tags?: string[] | null
           title?: string
+          token_cost?: number | null
           updated_at?: string
           user_id?: string
           view_condition?: Database["public"]["Enums"]["view_condition"]
@@ -330,6 +336,7 @@ export type Database = {
           id: string
           is_18_confirmed: boolean
           subscribers_count: number
+          tokens_balance: number
           updated_at: string
           user_id: string
           username: string
@@ -339,6 +346,7 @@ export type Database = {
           id?: string
           is_18_confirmed?: boolean
           subscribers_count?: number
+          tokens_balance?: number
           updated_at?: string
           user_id: string
           username: string
@@ -348,6 +356,7 @@ export type Database = {
           id?: string
           is_18_confirmed?: boolean
           subscribers_count?: number
+          tokens_balance?: number
           updated_at?: string
           user_id?: string
           username?: string
@@ -374,6 +383,78 @@ export type Database = {
           subscriber_id?: string
         }
         Relationships: []
+      }
+      token_purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          payment_id: string | null
+          status: string
+          tokens_amount: number
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          status?: string
+          tokens_amount: number
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          status?: string
+          tokens_amount?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      token_transactions: {
+        Row: {
+          created_at: string
+          id: string
+          media_id: string | null
+          post_id: string | null
+          tokens_spent: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_id?: string | null
+          post_id?: string | null
+          tokens_spent: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_id?: string | null
+          post_id?: string | null
+          tokens_spent?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_transactions_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_transactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
