@@ -76,6 +76,24 @@ const Messages = () => {
             if (newMsg.sender_id === activeConversation) {
               setMessages(prev => [...prev, newMsg]);
               markAsRead(activeConversation);
+            } else {
+              // Update conversation list
+              fetchConversations();
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${user?.id}`
+          },
+          () => {
+            // Refresh messages when read status changes
+            if (activeConversation) {
+              fetchMessages(activeConversation);
             }
           }
         )
@@ -101,30 +119,26 @@ const Messages = () => {
     if (!user) return;
 
     try {
-      // Get all messages where user is sender or receiver
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select('sender_id, receiver_id, content, created_at')
+        .select('sender_id, receiver_id, content, created_at, is_read')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (messagesError) throw messagesError;
 
-      // Group by conversation partner
       const conversationMap = new Map<string, Conversation>();
 
       for (const msg of messagesData || []) {
         const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
         
         if (!conversationMap.has(partnerId)) {
-          // Get partner's username
           const { data: profileData } = await supabase
             .from('profiles')
             .select('username')
             .eq('user_id', partnerId)
             .single();
 
-          // Count unread messages
           const { count } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
@@ -135,14 +149,19 @@ const Messages = () => {
           conversationMap.set(partnerId, {
             user_id: partnerId,
             username: profileData?.username || 'Пользователь',
-            last_message: msg.content,
+            last_message: msg.content || '📷 Изображение',
             last_message_time: msg.created_at,
             unread_count: count || 0
           });
         }
       }
 
-      setConversations(Array.from(conversationMap.values()));
+      // Sort by last message time
+      const sortedConversations = Array.from(conversationMap.values()).sort((a, b) => 
+        new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime()
+      );
+      
+      setConversations(sortedConversations);
     } catch (error) {
       console.error('Error fetching conversations:', error);
       toast({
@@ -406,19 +425,26 @@ const Messages = () => {
                           onClick={() => window.open(msg.image_url!, '_blank')}
                         />
                       )}
-                      {msg.content && <p className="break-words">{msg.content}</p>}
-                      <p
-                        className={`text-xs mt-1 ${
-                          msg.sender_id === user.id
-                            ? 'text-primary-foreground/70'
-                            : 'text-muted-foreground'
-                        }`}
-                      >
-                        {new Date(msg.created_at).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
+                       {msg.content && <p className="break-words">{msg.content}</p>}
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p
+                          className={`text-xs ${
+                            msg.sender_id === user.id
+                              ? 'text-primary-foreground/70'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          {new Date(msg.created_at).toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        {msg.sender_id === user.id && (
+                          <span className={`text-xs ${msg.is_read ? 'text-primary-foreground/70' : 'text-primary-foreground/50'}`}>
+                            {msg.is_read ? '✓✓' : '✓'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

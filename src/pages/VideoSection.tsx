@@ -48,7 +48,8 @@ const VideoSection = () => {
     description: '', 
     file: null as File | null,
     viewCondition: 'none' as 'none' | 'like' | 'comment' | 'subscription',
-    password: ''
+    password: '',
+    tokenCost: '0'
   });
   const [isLiveStreamOpen, setIsLiveStreamOpen] = useState(false);
   const [viewingStreamId, setViewingStreamId] = useState<string | null>(null);
@@ -302,6 +303,7 @@ const VideoSection = () => {
     setUploading(true);
     try {
       // Создаем пост для видео
+      const tokenCostValue = parseFloat(uploadData.tokenCost) || 0;
       const { data: postData, error: postError } = await supabase
         .from('posts')
         .insert({
@@ -310,7 +312,8 @@ const VideoSection = () => {
           content: uploadData.description,
           category: 'media',
           view_condition: uploadData.viewCondition,
-          password: uploadData.password || null
+          password: uploadData.password || null,
+          token_cost: tokenCostValue
         })
         .select()
         .single();
@@ -344,7 +347,8 @@ const VideoSection = () => {
           file_type: uploadData.file.type,
           content_type: 'video',
           file_size: uploadData.file.size,
-          post_id: postData.id
+          post_id: postData.id,
+          token_cost: parseFloat(uploadData.tokenCost) || 0
         });
 
       if (dbError) throw dbError;
@@ -354,7 +358,7 @@ const VideoSection = () => {
         description: "Видео загружено успешно",
       });
 
-      setUploadData({ title: '', description: '', file: null, viewCondition: 'none', password: '' });
+      setUploadData({ title: '', description: '', file: null, viewCondition: 'none', password: '', tokenCost: '0' });
       fetchVideos();
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -459,6 +463,22 @@ const VideoSection = () => {
                   />
                   <p className="text-xs text-muted-foreground">
                     Установите пароль для дополнительной защиты контента
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="token-cost">Стоимость в токенах</Label>
+                  <Input
+                    id="token-cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={uploadData.tokenCost}
+                    onChange={(e) => setUploadData({ ...uploadData, tokenCost: e.target.value })}
+                    placeholder="0"
+                    className="border-lavender-light focus:ring-lavender"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Установите цену просмотра в токенах (0 = бесплатно)
                   </p>
                 </div>
                 <div className="space-y-2">

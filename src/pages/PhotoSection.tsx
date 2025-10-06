@@ -424,6 +424,22 @@ const PhotoSection = () => {
                   </p>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="token-cost">Стоимость в токенах</Label>
+                  <Input
+                    id="token-cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={uploadData.tokenCost}
+                    onChange={(e) => setUploadData({ ...uploadData, tokenCost: e.target.value })}
+                    placeholder="0"
+                    className="border-lavender-light focus:ring-lavender"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Установите цену просмотра в токенах (0 = бесплатно)
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="photo-file">Изображения (до 10 файлов)</Label>
                   <Input
                     id="photo-file"

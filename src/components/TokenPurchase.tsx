@@ -2,27 +2,47 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Coins, Loader2 } from "lucide-react";
-
-const TOKEN_PACKAGES = [
-  { amount: 5, tokens: 1.99 },
-  { amount: 10, tokens: 3.99 },
-  { amount: 25, tokens: 9.99 },
-  { amount: 50, tokens: 19.99 },
-];
 
 export const TokenPurchase = () => {
   const [loading, setLoading] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState<string | null>(null);
+  const [amount, setAmount] = useState<string>('10');
   const { toast } = useToast();
 
-  const handlePurchase = async (amount: number) => {
+  const calculateTokens = (usdAmount: number) => {
+    // 1 USD = 10 токенов
+    return usdAmount * 10;
+  };
+
+  const handlePurchase = async () => {
+    const usdAmount = parseFloat(amount);
+    
+    if (isNaN(usdAmount) || usdAmount < 1) {
+      toast({
+        title: "Ошибка",
+        description: "Минимальная сумма для покупки - $1",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (usdAmount > 1000) {
+      toast({
+        title: "Ошибка",
+        description: "Максимальная сумма для покупки - $1000",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       setLoading(true);
       
       const { data, error } = await supabase.functions.invoke('cryptobot-payment', {
-        body: { action: 'create-invoice', amount }
+        body: { action: 'create-invoice', amount: usdAmount }
       });
 
       if (error) throw error;
@@ -109,34 +129,61 @@ export const TokenPurchase = () => {
           Токены используются для просмотра платного контента
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {TOKEN_PACKAGES.map((pkg) => (
-            <Card key={pkg.amount} className="relative overflow-hidden">
-              <CardContent className="p-6">
-                <div className="text-center space-y-2">
-                  <div className="text-3xl font-bold">${pkg.amount}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {pkg.tokens.toFixed(2)} токенов
-                  </div>
-                  <Button
-                    onClick={() => handlePurchase(pkg.amount)}
-                    disabled={loading || !!checkingPayment}
-                    className="w-full mt-4"
-                  >
-                    {loading || checkingPayment ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {checkingPayment ? 'Ожидание оплаты...' : 'Обработка...'}
-                      </>
-                    ) : (
-                      'Купить'
-                    )}
-                  </Button>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="amount">Сумма (USD)</Label>
+            <Input
+              id="amount"
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Введите сумму"
+              disabled={loading || !!checkingPayment}
+            />
+            <p className="text-sm text-muted-foreground">
+              Минимум: $1 | Максимум: $1000
+            </p>
+          </div>
+          
+          {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) >= 1 && (
+            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Вы получите:</span>
+                <div className="flex items-center gap-2">
+                  <Coins className="h-5 w-5 text-primary" />
+                  <span className="text-2xl font-bold text-primary">
+                    {calculateTokens(parseFloat(amount))} токенов
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Курс: 1 USD = 10 токенов
+              </p>
+            </div>
+          )}
+          
+          <Button
+            onClick={handlePurchase}
+            disabled={loading || !!checkingPayment || !amount || parseFloat(amount) < 1}
+            className="w-full"
+            size="lg"
+          >
+            {loading || checkingPayment ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {checkingPayment ? 'Ожидание оплаты...' : 'Обработка...'}
+              </>
+            ) : (
+              <>
+                <Coins className="mr-2 h-4 w-4" />
+                Купить токены за ${amount}
+              </>
+            )}
+          </Button>
         </div>
         
         <div className="text-xs text-muted-foreground text-center pt-4 border-t">

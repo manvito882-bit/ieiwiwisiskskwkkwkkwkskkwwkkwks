@@ -34,8 +34,8 @@ serve(async (req) => {
     }
 
     if (action === 'create-invoice') {
-      // Calculate tokens based on amount (5$ = 1.99 tokens)
-      const tokensAmount = (amount / 5) * 1.99;
+      // Calculate tokens: 1 USD = 10 tokens
+      const tokensAmount = amount * 10;
       
       console.log(`Creating invoice for user ${user.id}: $${amount} = ${tokensAmount} tokens`);
 
@@ -90,7 +90,8 @@ serve(async (req) => {
     }
 
     if (action === 'check-payment') {
-      const { invoiceId } = await req.json();
+      const body = await req.json();
+      const { invoiceId } = body;
       
       console.log(`Checking payment status for invoice ${invoiceId}`);
 
