@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PasswordPrompt } from '@/components/PasswordPrompt';
+import { ContentUnlock } from '@/components/ContentUnlock';
 
 interface MediaItem {
   id: string;
@@ -33,6 +34,8 @@ interface MediaItem {
   canView?: boolean;
   password?: string | null;
   passwordVerified?: boolean;
+  token_cost?: number;
+  tokenUnlocked?: boolean;
   profiles?: {
     username: string;
   } | null;
@@ -141,6 +144,7 @@ const VideoSection = () => {
     const isOwner = user?.id === video.user_id;
     if (isOwner) return true;
     if (!video.canView) return false;
+    if ((video.token_cost ?? 0) > 0 && !video.tokenUnlocked) return false;
     if (video.password && !video.passwordVerified) return false;
     return true;
   };
@@ -178,14 +182,15 @@ const VideoSection = () => {
       const [{ data: profilesData }, { data: postsData }] = await Promise.all([
         supabase.from('profiles').select('user_id, username').in('user_id', userIds),
         postIds.length > 0 
-          ? supabase.from('posts').select('id, likes_count, view_condition').in('id', postIds)
+          ? supabase.from('posts').select('id, likes_count, view_condition, password, token_cost').in('id', postIds)
           : Promise.resolve({ data: [] })
       ]);
 
-      // Получаем лайки, комментарии и подписки пользователя если он авторизован
+      // Получаем лайки, комментарии, подписки и токен-транзакции пользователя если он авторизован
       let userLikes: string[] = [];
       let userComments: string[] = [];
       let userSubscriptions: string[] = [];
+      let unlockedMedia: string[] = [];
       if (user) {
         const promises = [
           postIds.length > 0 
@@ -194,12 +199,14 @@ const VideoSection = () => {
           postIds.length > 0
             ? supabase.from('comments').select('post_id').eq('user_id', user.id).in('post_id', postIds)
             : Promise.resolve({ data: [] }),
-          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id)
+          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id),
+          supabase.from('token_transactions').select('media_id').eq('user_id', user.id).not('media_id', 'is', null)
         ];
-        const [{ data: likesData }, { data: commentsData }, { data: subsData }] = await Promise.all(promises);
+        const [{ data: likesData }, { data: commentsData }, { data: subsData }, { data: transactionsData }] = await Promise.all(promises);
         userLikes = likesData?.map(like => like.post_id) || [];
         userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
         userSubscriptions = subsData?.map(sub => sub.subscribed_to_id) || [];
+        unlockedMedia = transactionsData?.map(t => t.media_id).filter(Boolean) as string[] || [];
       }
 
       // Объединяем данные
@@ -209,6 +216,7 @@ const VideoSection = () => {
         const hasCommented = video.post_id ? userComments.includes(video.post_id) : false;
         const isSubscribed = userSubscriptions.includes(video.user_id);
         const isOwner = user?.id === video.user_id;
+        const tokenUnlocked = unlockedMedia.includes(video.id);
         
         // Определяем можно ли просматривать контент
         let canView = true;
@@ -228,11 +236,13 @@ const VideoSection = () => {
           likes_count: post?.likes_count || 0,
           view_condition: post?.view_condition || 'none',
           password: post?.password || null,
+          token_cost: post?.token_cost || video.token_cost || 0,
           isLiked,
           hasCommented,
           isSubscribed,
           canView,
-          passwordVerified: false
+          passwordVerified: false,
+          tokenUnlocked
         };
       });
 
@@ -574,7 +584,15 @@ const VideoSection = () => {
           {videos.map((video) => (
             <Card key={video.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
               <div className="aspect-video bg-gray-100 relative">
-                {canPlayVideo(video) ? (
+                {(video.token_cost ?? 0) > 0 && !video.tokenUnlocked && user?.id !== video.user_id ? (
+                  <div className="w-full h-full flex items-center justify-center bg-muted p-4">
+                    <ContentUnlock 
+                      mediaId={video.id}
+                      tokenCost={video.token_cost ?? 0}
+                      onUnlocked={() => fetchVideos()}
+                    />
+                  </div>
+                ) : canPlayVideo(video) ? (
                   <video
                     src={video.file_url}
                     controls

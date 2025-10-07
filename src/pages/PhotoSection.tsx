@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PasswordPrompt } from '@/components/PasswordPrompt';
+import { ContentUnlock } from '@/components/ContentUnlock';
 
 interface MediaItem {
   id: string;
@@ -159,6 +160,11 @@ const PhotoSection = () => {
       return; // Не выполнены условия (лайк/комментарий/подписка)
     }
 
+    // Проверка токенов
+    if ((post.token_cost ?? 0) > 0 && !post.tokenUnlocked) {
+      return; // Контент не разблокирован токенами
+    }
+
     // Проверка пароля
     if (post.password && !post.passwordVerified) {
       setPasswordPrompt({ isOpen: true, postId: post.id });
@@ -201,19 +207,22 @@ const PhotoSection = () => {
         .select('user_id, username')
         .in('user_id', userIds);
 
-      // Получаем лайки, комментарии и подписки пользователя если он авторизован
+      // Получаем лайки, комментарии, подписки и токен-транзакции пользователя если он авторизован
       let userLikes: string[] = [];
       let userComments: string[] = [];
       let userSubscriptions: string[] = [];
+      let unlockedPosts: string[] = [];
       if (user) {
-        const [{ data: likesData }, { data: commentsData }, { data: subsData }] = await Promise.all([
+        const [{ data: likesData }, { data: commentsData }, { data: subsData }, { data: transactionsData }] = await Promise.all([
           supabase.from('post_likes').select('post_id').eq('user_id', user.id),
           supabase.from('comments').select('post_id').eq('user_id', user.id),
-          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id)
+          supabase.from('subscriptions').select('subscribed_to_id').eq('subscriber_id', user.id),
+          supabase.from('token_transactions').select('post_id').eq('user_id', user.id).not('post_id', 'is', null)
         ]);
         userLikes = likesData?.map(like => like.post_id) || [];
         userComments = [...new Set(commentsData?.map(comment => comment.post_id) || [])];
         userSubscriptions = subsData?.map(sub => sub.subscribed_to_id) || [];
+        unlockedPosts = transactionsData?.map(t => t.post_id).filter(Boolean) as string[] || [];
       }
 
       // Объединяем данные
@@ -222,6 +231,7 @@ const PhotoSection = () => {
         const hasCommented = userComments.includes(post.id);
         const isSubscribed = userSubscriptions.includes(post.user_id);
         const isOwner = user?.id === post.user_id;
+        const tokenUnlocked = unlockedPosts.includes(post.id);
         
         // Определяем можно ли просматривать контент
         let canView = true;
@@ -242,7 +252,8 @@ const PhotoSection = () => {
           hasCommented,
           isSubscribed,
           canView,
-          passwordVerified: false
+          passwordVerified: false,
+          tokenUnlocked
         };
       });
 
@@ -511,25 +522,37 @@ const PhotoSection = () => {
                       {post.media.map((media, index) => (
                         <CarouselItem key={media.id}>
                            <div className="relative w-full h-full">
-                            <img
-                              src={media.file_url}
-                              alt={media.title}
-                              className={`w-full h-full object-cover cursor-pointer ${
-                                (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
-                              }`}
-                              loading="lazy"
-                              onClick={() => handleMediaClick(post, index)}
-                            />
-                            {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
-                                <Lock className="w-12 h-12 mb-2" />
-                                <p className="text-center font-semibold">
-                                  {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
-                                  {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
-                                  {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
-                                  {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
-                                </p>
+                            {(post.token_cost ?? 0) > 0 && !post.tokenUnlocked && user?.id !== post.user_id ? (
+                              <div className="w-full h-full flex items-center justify-center bg-muted p-4">
+                                <ContentUnlock 
+                                  postId={post.id}
+                                  tokenCost={post.token_cost ?? 0}
+                                  onUnlocked={() => fetchPosts()}
+                                />
                               </div>
+                            ) : (
+                              <>
+                                <img
+                                  src={media.file_url}
+                                  alt={media.title}
+                                  className={`w-full h-full object-cover cursor-pointer ${
+                                    (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
+                                  }`}
+                                  loading="lazy"
+                                  onClick={() => handleMediaClick(post, index)}
+                                />
+                                {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
+                                    <Lock className="w-12 h-12 mb-2" />
+                                    <p className="text-center font-semibold">
+                                      {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                                      {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                                      {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                                      {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
+                                    </p>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </CarouselItem>
@@ -540,25 +563,37 @@ const PhotoSection = () => {
                   </Carousel>
                 ) : post.media.length === 1 ? (
                   <div className="relative w-full h-full">
-                    <img
-                      src={post.media[0].file_url}
-                      alt={post.media[0].title}
-                      className={`w-full h-full object-cover cursor-pointer ${
-                        (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
-                      }`}
-                      loading="lazy"
-                      onClick={() => handleMediaClick(post, 0)}
-                    />
-                    {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
-                        <Lock className="w-12 h-12 mb-2" />
-                        <p className="text-center font-semibold text-sm">
-                          {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
-                          {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
-                          {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
-                          {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
-                        </p>
+                    {(post.token_cost ?? 0) > 0 && !post.tokenUnlocked && user?.id !== post.user_id ? (
+                      <div className="w-full h-full flex items-center justify-center bg-muted p-4">
+                        <ContentUnlock 
+                          postId={post.id}
+                          tokenCost={post.token_cost ?? 0}
+                          onUnlocked={() => fetchPosts()}
+                        />
                       </div>
+                    ) : (
+                      <>
+                        <img
+                          src={post.media[0].file_url}
+                          alt={post.media[0].title}
+                          className={`w-full h-full object-cover cursor-pointer ${
+                            (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
+                          }`}
+                          loading="lazy"
+                          onClick={() => handleMediaClick(post, 0)}
+                        />
+                        {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
+                            <Lock className="w-12 h-12 mb-2" />
+                            <p className="text-center font-semibold text-sm">
+                              {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
+                              {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
+                              {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
+                              {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : null}

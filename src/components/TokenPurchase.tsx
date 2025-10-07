@@ -10,7 +10,7 @@ import { Coins, Loader2 } from "lucide-react";
 export const TokenPurchase = () => {
   const [loading, setLoading] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState<string | null>(null);
-  const [amount, setAmount] = useState<string>('10');
+  const [amount, setAmount] = useState<string>('1');
   const { toast } = useToast();
 
   const calculateTokens = (usdAmount: number) => {
@@ -21,10 +21,10 @@ export const TokenPurchase = () => {
   const handlePurchase = async () => {
     const usdAmount = parseFloat(amount);
     
-    if (isNaN(usdAmount) || usdAmount < 1) {
+    if (isNaN(usdAmount) || usdAmount < 0.25) {
       toast({
         title: "Ошибка",
-        description: "Минимальная сумма для покупки - $1",
+        description: "Минимальная сумма для покупки - $0.25",
         variant: "destructive",
       });
       return;
@@ -136,20 +136,20 @@ export const TokenPurchase = () => {
             <Input
               id="amount"
               type="number"
-              min="1"
+              min="0.25"
               max="1000"
-              step="1"
+              step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Введите сумму"
+              placeholder="Введите сумму в USD (мин. 0.25$)"
               disabled={loading || !!checkingPayment}
             />
             <p className="text-sm text-muted-foreground">
-              Минимум: $1 | Максимум: $1000
+              Минимум: $0.25 | Максимум: $1000
             </p>
           </div>
           
-          {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) >= 1 && (
+          {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) >= 0.25 && (
             <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Вы получите:</span>
@@ -168,7 +168,7 @@ export const TokenPurchase = () => {
           
           <Button
             onClick={handlePurchase}
-            disabled={loading || !!checkingPayment || !amount || parseFloat(amount) < 1}
+            disabled={loading || !!checkingPayment || !amount || parseFloat(amount) < 0.25}
             className="w-full"
             size="lg"
           >
