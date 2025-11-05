@@ -1,7 +1,1 @@
-project_id = "jivshzkyrhmdmjumjfve"
-
-[functions.cryptobot-payment]
-verify_jwt = true
-
-[functions.spend-tokens]
-verify_jwt = true
+project_id = "lropdxujmbdllgwthigu"
