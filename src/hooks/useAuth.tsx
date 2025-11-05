@@ -50,16 +50,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Проверяем уникальность username
-      const { data: isAvailable, error: checkError } = await supabase.rpc('is_username_available', {
-        username_param: username
-      });
+      // Проверяем уникальность username через прямой запрос к profiles
+      const { data: existingProfiles, error: checkError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .maybeSingle();
 
-      if (checkError) {
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Username check error:', checkError);
         return { error: 'Ошибка проверки username' };
       }
 
-      if (!isAvailable) {
+      if (existingProfiles) {
         return { error: 'Username уже занят' };
       }
 
@@ -87,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { success: true };
     } catch (error) {
+      console.error('Signup error:', error);
       return { error: 'Произошла ошибка при регистрации' };
     } finally {
       setLoading(false);
