@@ -27,38 +27,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    
+    // Таймаут на случай если Supabase недоступен
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 3000);
+
     // Настройка слушателя изменений аутентификации
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+          clearTimeout(timeout);
+        }
       }
     );
 
     // Проверка существующей сессии
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+          clearTimeout(timeout);
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting session:', error);
+        if (mounted) {
+          setLoading(false);
+          clearTimeout(timeout);
+        }
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (username: string, password: string, is18Confirmed: boolean) => {
     try {
       setLoading(true);
       
-      // Проверяем уникальность username через прямой запрос к profiles
-      const { data: existingProfiles, error: checkError } = await supabase
+      // Проверяем уникальность username с таймаутом
+      const checkTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      
+      const checkPromise = supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
         .maybeSingle();
 
+      const { data: existingProfiles, error: checkError } = await Promise.race([
+        checkPromise, 
+        checkTimeoutPromise
+      ]) as any;
+
       if (checkError && checkError.code !== 'PGRST116') {
         console.error('Username check error:', checkError);
+        if (checkError.message === 'Timeout') {
+          return { error: 'Сервер недоступен. Попробуйте позже' };
+        }
         return { error: 'Ошибка проверки username' };
       }
 
@@ -69,8 +108,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Создаем временный email для Supabase auth
       const tempEmail = `${username}@temp.local`;
       
-      // Регистрируем пользователя через стандартный Supabase auth
-      const { error: signUpError } = await supabase.auth.signUp({
+      // Регистрируем пользователя через стандартный Supabase auth с таймаутом
+      const signUpTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      
+      const signUpPromise = supabase.auth.signUp({
         email: tempEmail,
         password: password,
         options: {
@@ -81,7 +124,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       });
 
+      const { error: signUpError } = await Promise.race([
+        signUpPromise, 
+        signUpTimeoutPromise
+      ]) as any;
+
       if (signUpError) {
+        if (signUpError.message === 'Timeout') {
+          return { error: 'Сервер недоступен. Попробуйте позже' };
+        }
         if (signUpError.message.includes('already registered')) {
           return { error: 'Пользователь уже существует' };
         }
@@ -89,8 +140,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup error:', error);
+      if (error.message === 'Timeout') {
+        return { error: 'Сервер недоступен. Попробуйте позже' };
+      }
       return { error: 'Произошла ошибка при регистрации' };
     } finally {
       setLoading(false);
@@ -104,18 +158,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Создаем временный email для Supabase auth
       const tempEmail = `${username}@temp.local`;
       
-      // Входим через стандартный Supabase auth
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // Входим через стандартный Supabase auth с таймаутом
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      
+      const signInPromise = supabase.auth.signInWithPassword({
         email: tempEmail,
         password: password
       });
 
+      const { error: signInError } = await Promise.race([signInPromise, timeoutPromise]) as any;
+
       if (signInError) {
+        if (signInError.message === 'Timeout') {
+          return { error: 'Сервер недоступен. Попробуйте позже' };
+        }
         return { error: 'Неверный username или пароль' };
       }
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      if (error.message === 'Timeout') {
+        return { error: 'Сервер недоступен. Попробуйте позже' };
+      }
       return { error: 'Произошла ошибка при входе' };
     } finally {
       setLoading(false);
