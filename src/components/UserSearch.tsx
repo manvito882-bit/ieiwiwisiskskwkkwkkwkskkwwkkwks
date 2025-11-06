@@ -14,7 +14,7 @@ import {
 
 interface SearchResult {
   username: string;
-  user_id: string;
+  id: string;
 }
 
 const UserSearch = () => {
@@ -35,7 +35,7 @@ const UserSearch = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, user_id')
+        .select('username, id')
         .ilike('username', `%${query}%`)
         .limit(5);
 
@@ -86,7 +86,7 @@ const UserSearch = () => {
           <div className="py-2">
             {results.map((result) => (
               <div
-                key={result.user_id}
+                key={result.id}
                 className="flex items-center justify-between px-4 py-2 hover:bg-muted group"
               >
                 <Button
@@ -97,12 +97,12 @@ const UserSearch = () => {
                   <User className="w-4 h-4 mr-2 text-lavender" />
                   {result.username}
                 </Button>
-                {user && user.id !== result.user_id && (
+                {user && user.id !== result.id && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => handleMessage(result.user_id, result.username, e)}
+                    onClick={(e) => handleMessage(result.id, result.username, e)}
                   >
                     <MessageCircle className="w-4 h-4" />
                   </Button>

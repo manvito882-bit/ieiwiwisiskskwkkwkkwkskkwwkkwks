@@ -14,6 +14,195 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          id: string
+          is_active: boolean | null
+          stream_key: string | null
+          title: string
+          user_id: string
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          stream_key?: string | null
+          title: string
+          user_id: string
+          viewer_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          stream_key?: string | null
+          title?: string
+          user_id?: string
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
+      media: {
+        Row: {
+          content_type: string
+          created_at: string | null
+          description: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          post_id: string | null
+          title: string
+          token_cost: number | null
+          user_id: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          post_id?: string | null
+          title: string
+          token_cost?: number | null
+          user_id: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          post_id?: string | null
+          title?: string
+          token_cost?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          category: string
+          content: string | null
+          created_at: string | null
+          id: string
+          likes_count: number | null
+          password: string | null
+          title: string
+          token_cost: number | null
+          updated_at: string | null
+          user_id: string
+          view_condition: string | null
+        }
+        Insert: {
+          category?: string
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          likes_count?: number | null
+          password?: string | null
+          title: string
+          token_cost?: number | null
+          updated_at?: string | null
+          user_id: string
+          view_condition?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          likes_count?: number | null
+          password?: string | null
+          title?: string
+          token_cost?: number | null
+          updated_at?: string | null
+          user_id?: string
+          view_condition?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -40,6 +229,75 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          subscribed_to_id: string
+          subscriber_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          subscribed_to_id: string
+          subscriber_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          subscribed_to_id?: string
+          subscriber_id?: string
+        }
+        Relationships: []
+      }
+      token_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: string
+          media_id: string | null
+          post_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          media_id?: string | null
+          post_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          media_id?: string | null
+          post_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_transactions_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_transactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
