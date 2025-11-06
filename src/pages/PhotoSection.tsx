@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame, Lock } from 'lucide-react';
+import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame, Lock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -204,8 +204,8 @@ const PhotoSection = () => {
       const userIds = [...new Set(postsData?.map(post => post.user_id) || [])];
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('user_id, username')
-        .in('user_id', userIds);
+        .select('id, username')
+        .in('id', userIds);
 
       // Получаем лайки, комментарии, подписки и токен-транзакции пользователя если он авторизован
       let userLikes: string[] = [];
@@ -247,7 +247,7 @@ const PhotoSection = () => {
 
         return {
           ...post,
-          profiles: profilesData?.find(p => p.user_id === post.user_id) || null,
+          profiles: profilesData?.find(p => p.id === post.user_id) || null,
           isLiked,
           hasCommented,
           isSubscribed,
@@ -346,6 +346,47 @@ const PhotoSection = () => {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.')) {
+      return;
+    }
+
+    try {
+      // Получаем все медиа этого поста
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+
+      // Удаляем файлы из storage
+      for (const media of post.media) {
+        const path = media.file_url.split('/media-images/')[1];
+        if (path) {
+          await supabase.storage.from('media-images').remove([path]);
+        }
+      }
+
+      // Удаляем медиа записи
+      await supabase.from('media').delete().eq('post_id', postId);
+
+      // Удаляем пост
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+
+      toast({
+        title: "Успешно",
+        description: "Пост удален",
+      });
+
+      fetchPosts();
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить пост",
+        variant: "destructive"
+      });
     }
   };
 
@@ -613,18 +654,30 @@ const PhotoSection = () => {
                 </Button>
               </div>
               <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="w-4 h-4 text-lavender" />
-                  <button
-                    onClick={() => post.profiles?.username && navigate(`/profile/${post.profiles.username}`)}
-                    className="font-medium hover:text-lavender transition-colors"
-                  >
-                    {post.profiles?.username || 'Пользователь'}
-                  </button>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(post.created_at).toLocaleDateString('ru-RU')}
-                  </span>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-lavender" />
+                    <button
+                      onClick={() => post.profiles?.username && navigate(`/profile/${post.profiles.username}`)}
+                      className="font-medium hover:text-lavender transition-colors"
+                    >
+                      {post.profiles?.username || 'Пользователь'}
+                    </button>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(post.created_at).toLocaleDateString('ru-RU')}
+                    </span>
+                  </div>
+                  {user?.id === post.user_id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(post.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
                 
                 <h3 className="font-medium text-lg line-clamp-2">{post.title}</h3>

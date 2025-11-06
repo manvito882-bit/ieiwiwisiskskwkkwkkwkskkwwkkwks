@@ -13,12 +13,12 @@ export const TokenBalance = () => {
     const fetchBalance = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('tokens_balance')
-        .eq('user_id', user.id)
+        .select('token_balance')
+        .eq('id', user.id)
         .single();
 
       if (!error && data) {
-        setBalance(parseFloat(data.tokens_balance.toString()) || 0);
+        setBalance(parseFloat(data.token_balance.toString()) || 0);
       }
     };
 
@@ -33,11 +33,11 @@ export const TokenBalance = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `user_id=eq.${user.id}`,
+          filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          if (payload.new && 'tokens_balance' in payload.new) {
-            const balanceValue = payload.new.tokens_balance;
+          if (payload.new && 'token_balance' in payload.new) {
+            const balanceValue = payload.new.token_balance;
             setBalance(parseFloat(typeof balanceValue === 'string' ? balanceValue : String(balanceValue)) || 0);
           }
         }

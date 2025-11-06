@@ -19,7 +19,7 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
-  is_read: boolean;
+  read: boolean;
   image_url?: string | null;
 }
 
@@ -121,7 +121,7 @@ const Messages = () => {
     try {
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select('sender_id, receiver_id, content, created_at, is_read')
+        .select('sender_id, receiver_id, content, created_at, read')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
@@ -136,7 +136,7 @@ const Messages = () => {
           const { data: profileData } = await supabase
             .from('profiles')
             .select('username')
-            .eq('user_id', partnerId)
+            .eq('id', partnerId)
             .single();
 
           const { count } = await supabase
@@ -144,7 +144,7 @@ const Messages = () => {
             .select('*', { count: 'exact', head: true })
             .eq('sender_id', partnerId)
             .eq('receiver_id', user.id)
-            .eq('is_read', false);
+            .eq('read', false);
 
           conversationMap.set(partnerId, {
             user_id: partnerId,
@@ -202,10 +202,10 @@ const Messages = () => {
     try {
       await supabase
         .from('messages')
-        .update({ is_read: true })
+        .update({ read: true })
         .eq('sender_id', partnerId)
         .eq('receiver_id', user.id)
-        .eq('is_read', false);
+        .eq('read', false);
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -440,8 +440,8 @@ const Messages = () => {
                           })}
                         </p>
                         {msg.sender_id === user.id && (
-                          <span className={`text-xs ${msg.is_read ? 'text-primary-foreground/70' : 'text-primary-foreground/50'}`}>
-                            {msg.is_read ? '✓✓' : '✓'}
+                          <span className={`text-xs ${msg.read ? 'text-primary-foreground/70' : 'text-primary-foreground/50'}`}>
+                            {msg.read ? '✓✓' : '✓'}
                           </span>
                         )}
                       </div>

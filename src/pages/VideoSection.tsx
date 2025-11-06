@@ -180,7 +180,7 @@ const VideoSection = () => {
       const postIds = videosData?.filter(v => v.post_id).map(v => v.post_id) || [];
 
       const [{ data: profilesData }, { data: postsData }] = await Promise.all([
-        supabase.from('profiles').select('user_id, username').in('user_id', userIds),
+        supabase.from('profiles').select('id, username').in('id', userIds),
         postIds.length > 0 
           ? supabase.from('posts').select('id, likes_count, view_condition, password, token_cost').in('id', postIds)
           : Promise.resolve({ data: [] })
@@ -232,7 +232,7 @@ const VideoSection = () => {
         
         return {
           ...video,
-          profiles: profilesData?.find(p => p.user_id === video.user_id) || null,
+          profiles: profilesData?.find(p => p.id === video.user_id) || null,
           likes_count: post?.likes_count || 0,
           view_condition: post?.view_condition || 'none',
           password: post?.password || null,

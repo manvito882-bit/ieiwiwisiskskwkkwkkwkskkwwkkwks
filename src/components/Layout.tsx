@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins } from 'lucide-react';
 import UserSearch from '@/components/UserSearch';
-import { Notifications } from '@/components/Notifications';
 import { TokenBalance } from '@/components/TokenBalance';
 
 const Layout = () => {
@@ -83,7 +82,6 @@ const Layout = () => {
             <div className="flex items-center space-x-4">
               {user && (
                 <>
-                  <Notifications />
                   <TokenBalance />
                   <Badge variant="outline" className="border-lavender text-lavender">
                     <User className="w-3 h-3 mr-1" />

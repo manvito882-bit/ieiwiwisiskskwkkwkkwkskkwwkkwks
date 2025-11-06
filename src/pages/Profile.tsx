@@ -11,10 +11,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
-  user_id: string;
+  id: string;
   username: string;
   created_at: string;
-  subscribers_count: number;
 }
 
 interface MediaItem {
@@ -36,6 +35,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [subscribersCount, setSubscribersCount] = useState(0);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -51,13 +51,21 @@ const Profile = () => {
         if (profileError) throw profileError;
         setProfile(profileData);
 
+        // Get subscribers count
+        const { count } = await supabase
+          .from('subscriptions')
+          .select('*', { count: 'exact', head: true })
+          .eq('subscribed_to_id', profileData.id);
+        
+        setSubscribersCount(count || 0);
+
         // Check if current user is subscribed
-        if (user && user.id !== profileData.user_id) {
+        if (user && user.id !== profileData.id) {
           const { data: subData } = await supabase
             .from('subscriptions')
             .select('id')
             .eq('subscriber_id', user.id)
-            .eq('subscribed_to_id', profileData.user_id)
+            .eq('subscribed_to_id', profileData.id)
             .single();
           
           setIsSubscribed(!!subData);
@@ -66,7 +74,7 @@ const Profile = () => {
         const { data: mediaData, error: mediaError } = await supabase
           .from('media')
           .select('*')
-          .eq('user_id', profileData.user_id)
+          .eq('user_id', profileData.id)
           .order('created_at', { ascending: false });
 
         if (mediaError) throw mediaError;
@@ -98,12 +106,12 @@ const Profile = () => {
           .from('subscriptions')
           .delete()
           .eq('subscriber_id', user.id)
-          .eq('subscribed_to_id', profile.user_id);
+          .eq('subscribed_to_id', profile.id);
 
         if (error) throw error;
         
         setIsSubscribed(false);
-        setProfile(prev => prev ? { ...prev, subscribers_count: prev.subscribers_count - 1 } : null);
+        setSubscribersCount(prev => prev - 1);
         toast({
           title: 'Успешно',
           description: 'Вы отписались'
@@ -113,13 +121,13 @@ const Profile = () => {
           .from('subscriptions')
           .insert({
             subscriber_id: user.id,
-            subscribed_to_id: profile.user_id
+            subscribed_to_id: profile.id
           });
 
         if (error) throw error;
 
         setIsSubscribed(true);
-        setProfile(prev => prev ? { ...prev, subscribers_count: prev.subscribers_count + 1 } : null);
+        setSubscribersCount(prev => prev + 1);
         toast({
           title: 'Успешно',
           description: 'Вы подписались'
@@ -148,7 +156,7 @@ const Profile = () => {
     }
     navigate('/messages', { 
       state: { 
-        selectedUserId: profile?.user_id, 
+        selectedUserId: profile?.id, 
         selectedUsername: profile?.username 
       } 
     });
@@ -200,11 +208,11 @@ const Profile = () => {
                   })}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Подписчиков: {profile.subscribers_count}
+                  Подписчиков: {subscribersCount}
                 </p>
               </div>
             </div>
-            {user && user.id !== profile.user_id && (
+            {user && user.id !== profile.id && (
               <div className="flex gap-2">
                 <Button
                   variant={isSubscribed ? "outline" : "default"}

@@ -29,6 +29,7 @@ const UserSearch = () => {
     setSearch(query);
     if (!query.trim()) {
       setResults([]);
+      setOpen(false);
       return;
     }
 
@@ -37,11 +38,11 @@ const UserSearch = () => {
         .from('profiles')
         .select('username, id')
         .ilike('username', `%${query}%`)
-        .limit(5);
+        .limit(10);
 
       if (error) throw error;
       setResults(data || []);
-      setOpen(true);
+      setOpen(data && data.length > 0);
     } catch (error) {
       console.error('Error searching users:', error);
       toast({
