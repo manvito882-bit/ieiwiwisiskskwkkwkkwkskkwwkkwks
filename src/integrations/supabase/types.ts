@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      blocked_users: {
+        Row: {
+          blocked_user_id: string
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          blocked_user_id: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          blocked_user_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -136,26 +157,35 @@ export type Database = {
         Row: {
           content: string
           created_at: string | null
+          deleted_by_receiver: boolean | null
+          deleted_by_sender: boolean | null
           id: string
           read: boolean | null
           receiver_id: string
           sender_id: string
+          updated_at: string | null
         }
         Insert: {
           content: string
           created_at?: string | null
+          deleted_by_receiver?: boolean | null
+          deleted_by_sender?: boolean | null
           id?: string
           read?: boolean | null
           receiver_id: string
           sender_id: string
+          updated_at?: string | null
         }
         Update: {
           content?: string
           created_at?: string | null
+          deleted_by_receiver?: boolean | null
+          deleted_by_sender?: boolean | null
           id?: string
           read?: boolean | null
           receiver_id?: string
           sender_id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -232,25 +262,40 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
+          bio: string | null
+          can_receive_messages_from: string | null
           created_at: string | null
           id: string
           is_18_confirmed: boolean | null
+          is_online: boolean | null
+          last_seen: string | null
           token_balance: number | null
           updated_at: string | null
           username: string
         }
         Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          can_receive_messages_from?: string | null
           created_at?: string | null
           id: string
           is_18_confirmed?: boolean | null
+          is_online?: boolean | null
+          last_seen?: string | null
           token_balance?: number | null
           updated_at?: string | null
           username: string
         }
         Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          can_receive_messages_from?: string | null
           created_at?: string | null
           id?: string
           is_18_confirmed?: boolean | null
+          is_online?: boolean | null
+          last_seen?: string | null
           token_balance?: number | null
           updated_at?: string | null
           username?: string
