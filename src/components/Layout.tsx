@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins } from 'lucide-react';
+import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins, Radio } from 'lucide-react';
 import UserSearch from '@/components/UserSearch';
 import { TokenBalance } from '@/components/TokenBalance';
 
@@ -57,6 +57,15 @@ const Layout = () => {
                 >
                   <ImageIcon className="w-4 h-4 mr-2" />
                   Фото
+                </Button>
+                <Button
+                  variant={isActive('/streams') ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => navigate('/streams')}
+                  className={isActive('/streams') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+                >
+                  <Radio className="w-4 h-4 mr-2" />
+                  Эфиры
                 </Button>
                 <Button
                   variant={isActive('/messages') ? 'default' : 'ghost'}
@@ -133,6 +142,15 @@ const Layout = () => {
             >
               <ImageIcon className="w-4 h-4 mr-1" />
               Фото
+            </Button>
+            <Button
+              variant={isActive('/streams') ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => navigate('/streams')}
+              className={isActive('/streams') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+            >
+              <Radio className="w-4 h-4 mr-1" />
+              Эфиры
             </Button>
             <Button
               variant={isActive('/messages') ? 'default' : 'ghost'}

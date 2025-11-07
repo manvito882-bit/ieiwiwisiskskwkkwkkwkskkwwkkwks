@@ -14,6 +14,7 @@ const PhotoSection = lazy(() => import('./pages/PhotoSection'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Messages = lazy(() => import('./components/Messages'));
 const Tokens = lazy(() => import('./pages/Tokens'));
+const LiveStreams = lazy(() => import('./pages/LiveStreams'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const App = () => (
                   <Route index element={<Index />} />
                   <Route path="/videos" element={<VideoSection />} />
                   <Route path="/photos" element={<PhotoSection />} />
+                  <Route path="/streams" element={<LiveStreams />} />
                   <Route path="/profile/:username" element={<Profile />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/tokens" element={<Tokens />} />

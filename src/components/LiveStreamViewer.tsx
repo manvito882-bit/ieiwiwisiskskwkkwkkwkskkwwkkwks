@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Eye } from 'lucide-react';
+import { Eye, User } from 'lucide-react';
 
 interface LiveStreamViewerProps {
   streamId: string | null;
@@ -11,6 +12,7 @@ interface LiveStreamViewerProps {
 
 export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [streamData, setStreamData] = useState<any>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -30,15 +32,26 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
     if (!streamId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data: streamData, error } = await supabase
         .from('live_streams')
         .select('*')
         .eq('id', streamId)
         .single();
 
       if (error) throw error;
-      setStreamData(data);
-      setViewerCount(data.viewer_count || 0);
+
+      // Fetch profile data for the stream owner
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', streamData.user_id)
+        .single();
+
+      setStreamData({
+        ...streamData,
+        profiles: profileData,
+      });
+      setViewerCount(streamData.viewer_count || 0);
     } catch (error) {
       console.error('Error loading stream:', error);
       toast({
@@ -96,7 +109,20 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>{streamData?.title || 'Прямой эфир'}</span>
+            <div className="flex flex-col gap-1">
+              <span>{streamData?.title || 'Прямой эфир'}</span>
+              <button
+                onClick={() => {
+                  if (streamData?.profiles?.username) {
+                    navigate(`/profile/${streamData.profiles.username}`);
+                  }
+                }}
+                className="text-sm font-normal text-lavender hover:text-lavender-dark transition-colors flex items-center gap-1"
+              >
+                <User className="h-3 w-3" />
+                {streamData?.profiles?.username || 'Пользователь'}
+              </button>
+            </div>
             <div className="flex items-center gap-2 text-sm font-normal">
               <Eye className="h-4 w-4" />
               <span>{viewerCount}</span>
