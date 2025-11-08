@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins, Radio, Settings as SettingsIcon } from 'lucide-react';
+import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins, Radio, Settings as SettingsIcon, FileText } from 'lucide-react';
 import UserSearch from '@/components/UserSearch';
 import { TokenBalance } from '@/components/TokenBalance';
+import { Notifications } from '@/components/Notifications';
 
 const Layout = () => {
   const { user, signOut } = useAuth();
@@ -86,6 +87,15 @@ const Layout = () => {
                   Токены
                 </Button>
                 <Button
+                  variant={isActive('/create-post') ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => navigate('/create-post')}
+                  className={isActive('/create-post') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Пост
+                </Button>
+                <Button
                   variant={isActive('/settings') ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => navigate('/settings')}
@@ -100,6 +110,7 @@ const Layout = () => {
             <div className="flex items-center space-x-4">
               {user && (
                 <>
+                  <Notifications />
                   <TokenBalance />
                   <Badge variant="outline" className="border-lavender text-lavender">
                     <User className="w-3 h-3 mr-1" />

@@ -16,6 +16,7 @@ const Messages = lazy(() => import('./components/Messages'));
 const Tokens = lazy(() => import('./pages/Tokens'));
 const LiveStreams = lazy(() => import('./pages/LiveStreams'));
 const Settings = lazy(() => import('./pages/Settings'));
+const CreatePost = lazy(() => import('./pages/CreatePost'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -80,6 +81,7 @@ const App = () => (
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/tokens" element={<Tokens />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/create-post" element={<CreatePost />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

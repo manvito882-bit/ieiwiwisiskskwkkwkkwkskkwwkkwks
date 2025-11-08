@@ -189,6 +189,48 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          comment_id: string | null
+          created_at: string | null
+          id: string
+          link: string | null
+          message: string
+          post_id: string | null
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message: string
+          post_id?: string | null
+          read?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string
+          post_id?: string | null
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_likes: {
         Row: {
           created_at: string | null
@@ -270,6 +312,11 @@ export type Database = {
           is_18_confirmed: boolean | null
           is_online: boolean | null
           last_seen: string | null
+          notifications_enabled: boolean | null
+          notify_comments: boolean | null
+          notify_likes: boolean | null
+          notify_messages: boolean | null
+          notify_subscriptions: boolean | null
           token_balance: number | null
           updated_at: string | null
           username: string
@@ -283,6 +330,11 @@ export type Database = {
           is_18_confirmed?: boolean | null
           is_online?: boolean | null
           last_seen?: string | null
+          notifications_enabled?: boolean | null
+          notify_comments?: boolean | null
+          notify_likes?: boolean | null
+          notify_messages?: boolean | null
+          notify_subscriptions?: boolean | null
           token_balance?: number | null
           updated_at?: string | null
           username: string
@@ -296,6 +348,11 @@ export type Database = {
           is_18_confirmed?: boolean | null
           is_online?: boolean | null
           last_seen?: string | null
+          notifications_enabled?: boolean | null
+          notify_comments?: boolean | null
+          notify_likes?: boolean | null
+          notify_messages?: boolean | null
+          notify_subscriptions?: boolean | null
           token_balance?: number | null
           updated_at?: string | null
           username?: string
@@ -376,7 +433,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_notification: {
+        Args: {
+          p_actor_id?: string
+          p_comment_id?: string
+          p_link?: string
+          p_message: string
+          p_post_id?: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

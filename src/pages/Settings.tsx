@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { User, Upload, Shield, Trash2, Lock, UserX } from 'lucide-react';
+import { User, Upload, Shield, Trash2, Lock, UserX, Bell } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +30,11 @@ interface Profile {
   avatar_url?: string | null;
   bio?: string | null;
   can_receive_messages_from?: string;
+  notifications_enabled?: boolean;
+  notify_likes?: boolean;
+  notify_comments?: boolean;
+  notify_messages?: boolean;
+  notify_subscriptions?: boolean;
 }
 
 interface BlockedUser {
@@ -204,6 +209,33 @@ const Settings = () => {
     }
   };
 
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+
+      toast({
+        title: 'Успешно',
+        description: 'Настройки сохранены'
+      });
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось сохранить настройки',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const changePassword = async () => {
     if (!newPassword || newPassword !== confirmPassword) {
       toast({
@@ -325,7 +357,7 @@ const Settings = () => {
       <h1 className="text-3xl font-bold mb-6">Настройки</h1>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">
             <User className="w-4 h-4 mr-2" />
             Профиль
@@ -333,6 +365,10 @@ const Settings = () => {
           <TabsTrigger value="privacy">
             <Shield className="w-4 h-4 mr-2" />
             Приватность
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="w-4 h-4 mr-2" />
+            Уведомления
           </TabsTrigger>
           <TabsTrigger value="security">
             <Lock className="w-4 h-4 mr-2" />
@@ -451,6 +487,86 @@ const Settings = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>Настройки уведомлений</CardTitle>
+              <CardDescription>
+                Управляйте уведомлениями о различных событиях
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notifications-enabled">Все уведомления</Label>
+                    <p className="text-sm text-muted-foreground">Включить/выключить все уведомления</p>
+                  </div>
+                  <Switch 
+                    id="notifications-enabled"
+                    checked={profile?.notifications_enabled ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateProfile({ notifications_enabled: checked });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notify-likes">Уведомления о лайках</Label>
+                    <p className="text-sm text-muted-foreground">Когда кто-то лайкает ваши посты</p>
+                  </div>
+                  <Switch 
+                    id="notify-likes"
+                    checked={profile?.notify_likes ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateProfile({ notify_likes: checked });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notify-comments">Уведомления о комментариях</Label>
+                    <p className="text-sm text-muted-foreground">Когда кто-то комментирует ваши посты</p>
+                  </div>
+                  <Switch 
+                    id="notify-comments"
+                    checked={profile?.notify_comments ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateProfile({ notify_comments: checked });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notify-messages">Уведомления о сообщениях</Label>
+                    <p className="text-sm text-muted-foreground">Когда вам приходят новые сообщения</p>
+                  </div>
+                  <Switch 
+                    id="notify-messages"
+                    checked={profile?.notify_messages ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateProfile({ notify_messages: checked });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notify-subscriptions">Уведомления о подписках</Label>
+                    <p className="text-sm text-muted-foreground">Когда на вас подписываются</p>
+                  </div>
+                  <Switch 
+                    id="notify-subscriptions"
+                    checked={profile?.notify_subscriptions ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateProfile({ notify_subscriptions: checked });
+                    }}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
