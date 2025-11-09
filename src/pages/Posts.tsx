@@ -56,6 +56,7 @@ const Posts = () => {
       const { data: postsData, error } = await supabase
         .from('posts')
         .select('*')
+        .eq('category', 'general')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

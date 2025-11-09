@@ -17,6 +17,7 @@ import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { ContentUnlock } from '@/components/ContentUnlock';
+import { MediaViewer } from '@/components/MediaViewer';
 
 interface MediaItem {
   id: string;
@@ -61,6 +62,8 @@ const VideoSection = () => {
     isOpen: false, 
     videoId: null 
   });
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedVideoForViewer, setSelectedVideoForViewer] = useState<MediaItem | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -152,10 +155,11 @@ const VideoSection = () => {
   const handleVideoClick = (video: MediaItem) => {
     const isOwner = user?.id === video.user_id;
     
-    if (isOwner) return; // Владелец может смотреть без ограничений
-    if (!video.canView) return; // Не выполнены условия
-    
-    if (video.password && !video.passwordVerified) {
+    if (isOwner || canPlayVideo(video)) {
+      // Открываем в модальном окне
+      setSelectedVideoForViewer(video);
+      setViewerOpen(true);
+    } else if (video.password && !video.passwordVerified) {
       setPasswordPrompt({ isOpen: true, videoId: video.id });
     }
   };
@@ -593,15 +597,19 @@ const VideoSection = () => {
                     />
                   </div>
                 ) : canPlayVideo(video) ? (
-                  <video
-                    src={video.file_url}
-                    controls
-                    className="w-full h-full object-cover"
-                    preload="metadata"
+                  <div 
+                    className="w-full h-full bg-gray-100 flex items-center justify-center cursor-pointer relative group"
                     onClick={() => handleVideoClick(video)}
                   >
-                    Ваш браузер не поддерживает воспроизведение видео.
-                  </video>
+                    <video
+                      src={video.file_url}
+                      className="w-full h-full object-cover"
+                      preload="metadata"
+                    />
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play className="w-16 h-16 text-white" />
+                    </div>
+                  </div>
                 ) : (
                   <div 
                     className="w-full h-full flex flex-col items-center justify-center bg-muted cursor-pointer"
@@ -689,6 +697,25 @@ const VideoSection = () => {
         onClose={() => setPasswordPrompt({ isOpen: false, videoId: null })}
         onSubmit={(password) => passwordPrompt.videoId && handlePasswordSubmit(passwordPrompt.videoId, password)}
       />
+
+      {/* Media Viewer */}
+      {selectedVideoForViewer && (
+        <MediaViewer
+          media={[{
+            id: selectedVideoForViewer.id,
+            title: selectedVideoForViewer.title,
+            description: selectedVideoForViewer.description,
+            file_url: selectedVideoForViewer.file_url,
+            content_type: 'video'
+          }]}
+          currentIndex={0}
+          isOpen={viewerOpen}
+          onClose={() => {
+            setViewerOpen(false);
+            setSelectedVideoForViewer(null);
+          }}
+        />
+      )}
     </div>
   );
 };
