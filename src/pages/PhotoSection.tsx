@@ -9,13 +9,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Upload, Image, X, ZoomIn, User, MessageSquare, Flame, Lock, Trash2 } from 'lucide-react';
+import { Upload, User, MessageSquare, Flame, Lock, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Comments from '@/components/Comments';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { ContentUnlock } from '@/components/ContentUnlock';
+import { MediaViewer } from '@/components/MediaViewer';
 
 interface MediaItem {
   id: string;
@@ -543,7 +543,7 @@ const PhotoSection = () => {
       {posts.length === 0 ? (
         <Card className="text-center p-8 border-lavender-light">
           <CardContent className="space-y-4">
-            <Image className="w-16 h-16 mx-auto text-lavender" />
+            <div className="w-16 h-16 mx-auto text-lavender" />
             <div>
               <h3 className="text-lg font-medium">Пока нет фото-постов</h3>
               <p className="text-muted-foreground">
@@ -557,52 +557,7 @@ const PhotoSection = () => {
           {posts.map((post) => (
             <Card key={post.id} className="overflow-hidden border-lavender-light hover:shadow-lg transition-shadow">
               <div className="aspect-square bg-gray-100 overflow-hidden relative">
-                {post.media.length > 1 ? (
-                  <Carousel className="w-full h-full">
-                    <CarouselContent>
-                      {post.media.map((media, index) => (
-                        <CarouselItem key={media.id}>
-                           <div className="relative w-full h-full">
-                            {(post.token_cost ?? 0) > 0 && !post.tokenUnlocked && user?.id !== post.user_id ? (
-                              <div className="w-full h-full flex items-center justify-center bg-muted p-4">
-                                <ContentUnlock 
-                                  postId={post.id}
-                                  tokenCost={post.token_cost ?? 0}
-                                  onUnlocked={() => fetchPosts()}
-                                />
-                              </div>
-                            ) : (
-                              <>
-                                <img
-                                  src={media.file_url}
-                                  alt={media.title}
-                                  className={`w-full h-full object-cover cursor-pointer ${
-                                    (!post.canView || (post.password && !post.passwordVerified)) ? 'blur-xl' : ''
-                                  }`}
-                                  loading="lazy"
-                                  onClick={() => handleMediaClick(post, index)}
-                                />
-                                {(!post.canView || (post.password && !post.passwordVerified && user?.id !== post.user_id)) && (
-                                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white p-4">
-                                    <Lock className="w-12 h-12 mb-2" />
-                                    <p className="text-center font-semibold">
-                                      {!post.canView && post.view_condition === 'like' && 'Поставьте лайк 🔥 чтобы просмотреть'}
-                                      {!post.canView && post.view_condition === 'comment' && 'Оставьте комментарий 💬 чтобы просмотреть'}
-                                      {!post.canView && post.view_condition === 'subscription' && 'Подпишитесь 👤 чтобы просмотреть'}
-                                      {post.canView && post.password && !post.passwordVerified && '🔒 Защищено паролем'}
-                                    </p>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    <CarouselPrevious className="left-2" />
-                    <CarouselNext className="right-2" />
-                  </Carousel>
-                ) : post.media.length === 1 ? (
+                {post.media.length > 0 && (
                   <div className="relative w-full h-full">
                     {(post.token_cost ?? 0) > 0 && !post.tokenUnlocked && user?.id !== post.user_id ? (
                       <div className="w-full h-full flex items-center justify-center bg-muted p-4">
@@ -637,21 +592,13 @@ const PhotoSection = () => {
                       </>
                     )}
                   </div>
-                ) : null}
+                )}
                 
                 {post.media.length > 1 && (
                   <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
                     {post.media.length} фото
                   </div>
                 )}
-                
-                <Button
-                  size="sm"
-                  className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 text-white"
-                  onClick={() => handleMediaClick(post, 0)}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
               </div>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between text-sm">
@@ -717,74 +664,15 @@ const PhotoSection = () => {
         </div>
       )}
 
-      {/* Media Detail Modal with Carousel */}
-      <Dialog open={!!selectedMedia} onOpenChange={(open) => !open && setSelectedMedia(null)}>
-        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden">
-          {selectedMedia && (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedMedia.media.length > 1 
-                    ? `Фото ${selectedMedia.currentIndex + 1} из ${selectedMedia.media.length}`
-                    : selectedMedia.media[selectedMedia.currentIndex]?.title || 'Фото'
-                  }
-                </DialogTitle>
-                {selectedMedia.media[selectedMedia.currentIndex]?.description && (
-                  <DialogDescription>
-                    {selectedMedia.media[selectedMedia.currentIndex].description}
-                  </DialogDescription>
-                )}
-              </DialogHeader>
-              
-              {selectedMedia.media.length > 1 ? (
-                <Carousel className="w-full max-h-[75vh]">
-                  <CarouselContent>
-                    {selectedMedia.media.map((media, index) => (
-                      <CarouselItem key={media.id}>
-                        <div className="flex justify-center items-center h-[75vh] overflow-hidden">
-                          <img
-                            src={media.file_url}
-                            alt={media.title}
-                            className="max-w-full max-h-full object-contain cursor-zoom-in"
-                            onClick={() => window.open(media.file_url, '_blank')}
-                          />
-                        </div>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="left-4" />
-                  <CarouselNext className="right-4" />
-                </Carousel>
-              ) : (
-                <div className="flex justify-center items-center max-h-[75vh] overflow-hidden">
-                  <img
-                    src={selectedMedia.media[0].file_url}
-                    alt={selectedMedia.media[0].title}
-                    className="max-w-full max-h-full object-contain cursor-zoom-in"
-                    onClick={() => window.open(selectedMedia.media[0].file_url, '_blank')}
-                  />
-                </div>
-              )}
-              
-              <div className="flex justify-between items-center text-sm text-muted-foreground mt-4">
-                <span>
-                  Загружено: {new Date(selectedMedia.media[selectedMedia.currentIndex].created_at).toLocaleDateString('ru-RU')}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(selectedMedia.media[selectedMedia.currentIndex].file_url, '_blank')}
-                  >
-                    <ZoomIn className="w-4 h-4 mr-2" />
-                    Увеличить
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Модальное окно для просмотра фото */}
+      {selectedMedia && (
+        <MediaViewer
+          media={selectedMedia.media}
+          currentIndex={selectedMedia.currentIndex}
+          isOpen={!!selectedMedia}
+          onClose={() => setSelectedMedia(null)}
+        />
+      )}
 
       <PasswordPrompt
         isOpen={passwordPrompt.isOpen}

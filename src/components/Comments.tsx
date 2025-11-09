@@ -34,7 +34,15 @@ const Comments = ({ postId }: CommentsProps) => {
     try {
       const { data, error } = await supabase
         .from('comments')
-        .select('*, profiles!comments_user_id_fkey(username)')
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          profiles!inner (
+            username
+          )
+        `)
         .eq('post_id', postId)
         .order('created_at', { ascending: false });
 

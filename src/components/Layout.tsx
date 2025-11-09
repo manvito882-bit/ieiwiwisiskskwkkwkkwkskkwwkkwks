@@ -60,6 +60,15 @@ const Layout = () => {
                   Фото
                 </Button>
                 <Button
+                  variant={isActive('/posts') ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => navigate('/posts')}
+                  className={isActive('/posts') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Посты
+                </Button>
+                <Button
                   variant={isActive('/streams') ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => navigate('/streams')}
@@ -162,6 +171,15 @@ const Layout = () => {
             >
               <ImageIcon className="w-4 h-4 mr-1" />
               Фото
+            </Button>
+            <Button
+              variant={isActive('/posts') ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => navigate('/posts')}
+              className={isActive('/posts') ? 'bg-lavender hover:bg-lavender-dark' : ''}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Посты
             </Button>
             <Button
               variant={isActive('/streams') ? 'default' : 'ghost'}
