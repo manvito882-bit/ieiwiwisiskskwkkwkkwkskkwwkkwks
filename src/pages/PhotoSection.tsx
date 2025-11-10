@@ -151,7 +151,13 @@ const PhotoSection = () => {
     
     // Владелец может просматривать без ограничений
     if (isOwner) {
-      setSelectedMedia({ media: post.media, currentIndex: index });
+      // Добавляем user_id и post_id к каждому медиа элементу
+      const enrichedMedia = post.media.map(m => ({
+        ...m,
+        user_id: post.user_id,
+        post_id: post.id
+      }));
+      setSelectedMedia({ media: enrichedMedia, currentIndex: index });
       return;
     }
 
@@ -172,7 +178,12 @@ const PhotoSection = () => {
     }
 
     // Все проверки пройдены - открываем медиа
-    setSelectedMedia({ media: post.media, currentIndex: index });
+    const enrichedMedia = post.media.map(m => ({
+      ...m,
+      user_id: post.user_id,
+      post_id: post.id
+    }));
+    setSelectedMedia({ media: enrichedMedia, currentIndex: index });
   };
 
   useEffect(() => {

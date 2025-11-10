@@ -160,6 +160,7 @@ export type Database = {
           deleted_by_receiver: boolean | null
           deleted_by_sender: boolean | null
           id: string
+          image_url: string | null
           read: boolean | null
           receiver_id: string
           sender_id: string
@@ -171,6 +172,7 @@ export type Database = {
           deleted_by_receiver?: boolean | null
           deleted_by_sender?: boolean | null
           id?: string
+          image_url?: string | null
           read?: boolean | null
           receiver_id: string
           sender_id: string
@@ -182,6 +184,7 @@ export type Database = {
           deleted_by_receiver?: boolean | null
           deleted_by_sender?: boolean | null
           id?: string
+          image_url?: string | null
           read?: boolean | null
           receiver_id?: string
           sender_id?: string

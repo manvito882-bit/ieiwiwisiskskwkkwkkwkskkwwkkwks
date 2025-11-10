@@ -7,6 +7,7 @@ import { Play, Image as ImageIcon, Home, LogOut, User, MessageCircle, Coins, Rad
 import UserSearch from '@/components/UserSearch';
 import { TokenBalance } from '@/components/TokenBalance';
 import { Notifications } from '@/components/Notifications';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Layout = () => {
   const { user, signOut } = useAuth();
@@ -117,6 +118,7 @@ const Layout = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               {user && (
                 <>
                   <Notifications />

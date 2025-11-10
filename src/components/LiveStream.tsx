@@ -171,7 +171,6 @@ export const LiveStream = ({ isOpen, onClose, onStreamStart }: LiveStreamProps) 
               ref={videoRef}
               autoPlay
               playsInline
-              muted
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">

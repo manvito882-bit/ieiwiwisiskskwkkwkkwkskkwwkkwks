@@ -706,7 +706,9 @@ const VideoSection = () => {
             title: selectedVideoForViewer.title,
             description: selectedVideoForViewer.description,
             file_url: selectedVideoForViewer.file_url,
-            content_type: 'video'
+            content_type: 'video',
+            user_id: selectedVideoForViewer.user_id,
+            post_id: selectedVideoForViewer.post_id
           }]}
           currentIndex={0}
           isOpen={viewerOpen}
