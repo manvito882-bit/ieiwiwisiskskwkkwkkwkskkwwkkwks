@@ -67,6 +67,112 @@ export type Database = {
           },
         ]
       }
+      group_chats: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string | null
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string | null
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string | null
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "group_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          edited_at: string | null
+          group_id: string
+          id: string
+          image_url: string | null
+          is_edited: boolean | null
+          sender_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          edited_at?: string | null
+          group_id: string
+          id?: string
+          image_url?: string | null
+          is_edited?: boolean | null
+          sender_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          edited_at?: string | null
+          group_id?: string
+          id?: string
+          image_url?: string | null
+          is_edited?: boolean | null
+          sender_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "group_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_streams: {
         Row: {
           created_at: string | null
@@ -159,8 +265,10 @@ export type Database = {
           created_at: string | null
           deleted_by_receiver: boolean | null
           deleted_by_sender: boolean | null
+          edited_at: string | null
           id: string
           image_url: string | null
+          is_edited: boolean | null
           read: boolean | null
           receiver_id: string
           sender_id: string
@@ -171,8 +279,10 @@ export type Database = {
           created_at?: string | null
           deleted_by_receiver?: boolean | null
           deleted_by_sender?: boolean | null
+          edited_at?: string | null
           id?: string
           image_url?: string | null
+          is_edited?: boolean | null
           read?: boolean | null
           receiver_id: string
           sender_id: string
@@ -183,8 +293,10 @@ export type Database = {
           created_at?: string | null
           deleted_by_receiver?: boolean | null
           deleted_by_sender?: boolean | null
+          edited_at?: string | null
           id?: string
           image_url?: string | null
+          is_edited?: boolean | null
           read?: boolean | null
           receiver_id?: string
           sender_id?: string
